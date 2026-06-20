@@ -2,30 +2,12 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@id/dest_auth"
-    app:startDestination="@id/phoneFragment">
+    app:startDestination="@id/authFragment">
 
+    <!-- One fragment now. The phone/sms/name steps live on a Nav3 back stack INSIDE it. Other modules
+         reach the flow by the shared @id/dest_auth (this graph's id, declared in :core:designsystem). -->
     <fragment
-        android:id="@+id/phoneFragment"
-        android:name="io.dodo.nav3.feature.auth.PhoneFragment"
-        android:label="Phone">
-        <!-- Other modules navigate into this flow by the shared @id/dest_auth (this graph's id,
-             declared in :core:designsystem) instead of an implicit deep-link URI. -->
-        <action
-            android:id="@+id/action_phone_to_sms"
-            app:destination="@id/smsFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/smsFragment"
-        android:name="io.dodo.nav3.feature.auth.SmsFragment"
-        android:label="SMS code">
-        <action
-            android:id="@+id/action_sms_to_name"
-            app:destination="@id/nameFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/nameFragment"
-        android:name="io.dodo.nav3.feature.auth.NameFragment"
-        android:label="Your name" />
+        android:id="@+id/authFragment"
+        android:name="io.dodo.nav3.feature.auth.AuthFragment"
+        android:label="Auth" />
 </navigation>
