@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose) // LocalLifecycleOwner for the bottom-sheet recipe
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -52,4 +53,7 @@ dependencies {
     // --- Navigation 3 ---
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    // Material adaptive scenes (list-detail multipane)
+    implementation(libs.compose.material3.adaptive)
+    implementation(libs.androidx.material3.adaptive.navigation3)
 }
