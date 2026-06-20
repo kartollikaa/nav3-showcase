@@ -16,7 +16,7 @@ composeBom = "2025.06.01"
 nav3Core = "1.1.2"
 lifecycleViewmodelNav3 = "2.11.0-rc01"
 kotlinxSerializationCore = "1.9.0"
-material3AdaptiveNav3 = "1.3.0-beta02"
+material3AdaptiveNav3 = "1.3.0-alpha09"
 
 # --- Navigation 2 (used ONLY by the migration flow's baseline branch) ---
 navigation2 = "2.9.5"
