@@ -1,75 +1,66 @@
-# flow1/03-viewmodel-decorator — Scoping a ViewModel to a destination
+# flow1/04-animations — Different transitions per screen and per entry
 
-**Goal:** make each destination own its ViewModel, so the VM is **created when you navigate to the
-screen and cleared when you leave it** — and show what goes wrong without this.
+**Goal:** control how `NavDisplay` animates between destinations — set one default transition for the
+whole graph, then **override it for a single entry** so different screens animate differently.
 
-## What changed vs `flow1/02-scenes`
-- `:feature:catalog` gained a `ProductDetailViewModel`, a `ProductRepository`, and a manual-DI
-  `CatalogGraph` (the "Dagger seam").
-- `NavDisplay` now passes `entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator())`.
-- The `ProductDetail` entry builds its VM with `viewModel { ProductDetailViewModel(...) }`.
+## What changed vs `flow1/03-viewmodel-decorator`
+- `NavDisplay` gained three transition parameters: `transitionSpec` (push), `popTransitionSpec` (back),
+  and `predictivePopTransitionSpec` (the swipe-back gesture). They are the **default** for every navigation.
+- The `ProductDetail` entry **overrides** those defaults via metadata — it zooms in (scale + fade)
+  while every other screen slides.
 
-## The one line that matters
+## The two levels
 
 ```kotlin
 NavDisplay(
-    entryDecorators = listOf(
-        rememberSaveableStateHolderNavEntryDecorator(), // must be first; powers rememberSaveable {}
-        rememberViewModelStoreNavEntryDecorator(),      // ← gives each NavEntry its own ViewModelStore
-    ),
-    /* … */
+    // 1) DEFAULT for the whole graph. The receiver is an AnimatedContentTransitionScope, so
+    //    slideIntoContainer / slideOutOfContainer are available for free.
+    transitionSpec = {                                   // push (forward)
+        (slideIntoContainer(SlideDirection.Start, tween(350)) + fadeIn(tween(350))) togetherWith
+            (slideOutOfContainer(SlideDirection.Start, tween(350)) + fadeOut(tween(350)))
+    },
+    popTransitionSpec = { /* mirror image: slide towards End */ },
+    predictivePopTransitionSpec = { /* reuse the pop animation for the swipe gesture */ },
     entryProvider = entryProvider {
-        entry<ProductDetail> { key ->
-            val vm = viewModel { ProductDetailViewModel(CatalogGraph.productRepository, key.id) }
-            ProductDetailScreen(product = vm.product, clicks = vm.clicks, /* … */)
-        }
+        entry<ProductDetail>(
+            // 2) PER-ENTRY override — wins over the default for THIS destination only.
+            metadata = ListDetailSceneStrategy.detailPane() +
+                NavDisplay.transitionSpec { scaleIn(0.85f) + fadeIn() togetherWith fadeOut() } +
+                NavDisplay.popTransitionSpec { fadeIn() togetherWith (scaleOut(0.85f) + fadeOut()) },
+        ) { /* … */ }
     },
 )
 ```
 
-### What a decorator is
-A `NavEntryDecorator` wraps the content of **every** entry — a place to install per-entry
-infrastructure via `CompositionLocalProvider` and to clean up when the entry is popped. Nav3 ships two
-you should almost always use, in this order:
+A transition is just a `ContentTransform` — an `EnterTransition togetherWith` an `ExitTransition`,
+exactly like `AnimatedContent`. Nothing Nav3-specific about the motion itself; Nav3 only decides
+**which** `ContentTransform` to use for a given navigation.
 
-1. **`rememberSaveableStateHolderNavEntryDecorator()`** — must be first. It wraps each entry in a
-   `SaveableStateProvider` so `rememberSaveable {}` inside your screens is keyed per entry and
-   survives config changes / process death.
-2. **`rememberViewModelStoreNavEntryDecorator()`** (from `androidx.lifecycle:lifecycle-viewmodel-navigation3`)
-   — installs a dedicated `ViewModelStoreOwner` per entry. `viewModel()` inside that entry now resolves
-   to a store that lives exactly as long as the entry is on the back stack, and is **`clear()`-ed when
-   the entry is popped** (your `onCleared()` runs).
-
-> Naming note for the talk: earlier Nav3 alphas split this into `rememberSceneSetupNavEntryDecorator` /
-> `rememberSavedStateNavEntryDecorator`. On stable (1.x) the two above are the canonical decorators. If
-> your slides have the old names, this is the rename to mention.
+## Precedence (who wins)
+```
+transitioning NavEntry.metadata  >  current Scene.metadata  >  NavDisplay defaults
+```
+`ProductDetail`'s per-entry spec overrides the display default; any entry without an override falls
+back to the default. (A `Scene` can also override entry metadata — see the nuance below.)
 
 ## Why it matters
-- **Correct lifecycle = correct memory & state.** The detail VM (and its `viewModelScope` coroutines,
-  flows, observers) is torn down the moment the user backs out of that screen — not when the Activity
-  finally dies.
-- **Per-instance state.** Open *apple*, then "open another product" → *banana*. Each `ProductDetail`
-  entry gets its **own** VM instance (watch the `VM #n` label and the `Nav3VMScope` logcat tag).
-  Their `clicks` counters are independent.
-- **Survives rotation.** Increment a few times, rotate the device — the count stays, because the VM
-  outlives configuration changes while the entry is alive.
+- **One place for app-wide motion.** Set the house style once on `NavDisplay`; every screen inherits it.
+- **Per-destination expression.** A detail screen, a dialog, an onboarding step can each animate in a
+  way that fits — no global `AnimatedContent` plumbing, just metadata on the entry.
+- **Predictive back is first-class.** `predictivePopTransitionSpec` drives the Android 14+ swipe-back
+  preview and receives the swipe edge, so you can animate directionally.
 
-## What breaks if you DON'T add `rememberViewModelStoreNavEntryDecorator`
-Without it, `viewModel()` falls back to the nearest `ViewModelStoreOwner` — the **Activity**. Two failures:
-
-1. **State bleed.** `viewModel()` keyed only by type returns the *same* `ProductDetailViewModel` for
-   *apple* and *banana*. Open apple (clicks = 5), open banana → it still shows 5, and writes collide.
-   You'd have to invent a manual keying scheme to work around it.
-2. **Leaks / stale work.** The VM is never cleared when you leave the screen; it (and any running
-   `viewModelScope` jobs, collectors, cached data) lives until the Activity is destroyed. On a deep or
-   looping back stack that's a growing pile of zombie ViewModels.
-
-To demo it live: comment out the `rememberViewModelStoreNavEntryDecorator()` line, rerun, and bounce
-between apple and banana — the counter and `VM #n` label stop being per-product.
+## Scenes bring their own animation (the nuance)
+This branch still has the adaptive **list/detail** and **bottom-sheet** scenes from the earlier branches.
+`transitionSpec` animates **scene changes** — e.g. list → detail when the window is narrow (single pane).
+In two-pane mode list and detail share the *same* scene, so moving between them updates in place rather
+than running a transition. The bottom-sheet filter is an `OverlayScene`: its slide-up is the scene's own
+animation, not `transitionSpec`. Per-entry specs are honored by the single-pane scene.
 
 ## 🎤 Speaker cues
-- Open logcat filtered to `Nav3VMScope`. Push apple → "created VM #1". "Open another" → banana → "created VM #2".
-  Press back → "cleared VM #2". *"Lifecycle is automatic and tied to the back stack."*
-- Increment on apple, **rotate** → count survives (config change) but the VM isn't leaked across screens.
-- The reveal: delete the one decorator line, rerun, show the counter bleeding between products. Put it back.
-- Tie to DI: *"Dagger builds the object; Navigation 3 owns when it lives and dies. Those are different jobs."*
+- On a phone (single pane): tap a product → it **zooms** in (the per-entry override); press back → it
+  zooms out. Open the filter → it **slides up** (scene animation). Three different motions, one screen.
+- Point at `transitionSpec`: "This is the default for the whole app — one slide + fade." Then at
+  `ProductDetail`'s metadata: "This one block makes just this destination zoom instead."
+- Recite the precedence line: "entry beats scene beats the NavDisplay default."
+- Mention `predictivePopTransitionSpec`: "the same hook drives the Android swipe-back preview."

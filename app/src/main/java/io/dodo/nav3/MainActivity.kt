@@ -4,6 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -70,6 +77,24 @@ fun CatalogNavigation(modifier: Modifier = Modifier) {
             rememberViewModelStoreNavEntryDecorator(),
         ),
         sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy),
+        // ── Animations are the new thing on this branch ──────────────────────────────────────────
+        // These three lambdas are the DEFAULT transition for every navigation. The receiver is an
+        // AnimatedContentTransitionScope, so slideIntoContainer / slideOutOfContainer come for free.
+        transitionSpec = {
+            // push: the incoming screen slides in from the right and fades; the old one slides out left.
+            (slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(350)) + fadeIn(tween(350))) togetherWith
+                (slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(350)) + fadeOut(tween(350)))
+        },
+        popTransitionSpec = {
+            // back: the mirror image — everything slides to the right.
+            (slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(350)) + fadeIn(tween(350))) togetherWith
+                (slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(350)) + fadeOut(tween(350)))
+        },
+        // Predictive back (the swipe-from-edge gesture) reuses the pop animation; `it` is the swipe edge.
+        predictivePopTransitionSpec = {
+            (slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(350)) + fadeIn(tween(350))) togetherWith
+                (slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(350)) + fadeOut(tween(350)))
+        },
         entryProvider = entryProvider {
             entry<ProductList>(
                 metadata = ListDetailSceneStrategy.listPane(
@@ -82,7 +107,19 @@ fun CatalogNavigation(modifier: Modifier = Modifier) {
                 )
             }
             entry<ProductDetail>(
-                metadata = ListDetailSceneStrategy.detailPane(),
+                // Per-entry OVERRIDE: ProductDetail animates differently from the default — it zooms in
+                // (scale + fade) instead of sliding. Per-entry metadata beats the NavDisplay default
+                // (precedence: entry metadata > scene metadata > NavDisplay default). We merge the scene
+                // metadata (detailPane) with the transition metadata using Map `+`.
+                metadata = ListDetailSceneStrategy.detailPane() +
+                    NavDisplay.transitionSpec {
+                        (scaleIn(initialScale = 0.85f, animationSpec = tween(400)) + fadeIn(tween(400))) togetherWith
+                            fadeOut(tween(250))
+                    } +
+                    NavDisplay.popTransitionSpec {
+                        fadeIn(tween(250)) togetherWith
+                            (scaleOut(targetScale = 0.85f, animationSpec = tween(400)) + fadeOut(tween(400)))
+                    },
             ) { key ->
                 // viewModel() resolves against the per-entry ViewModelStoreOwner that the decorator
                 // installed. The initializer is our manual-DI construction (the "Dagger seam").
