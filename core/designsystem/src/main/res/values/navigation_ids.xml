@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Stable navigation destination IDs, declared in a module that EVERY feature depends on.
+
+      Navigation 2 navigates by resource ID (`navController.navigate(R.id.…)`), but a destination's
+      generated ID lives in the module that owns its nav graph XML — invisible to sibling feature
+      modules. Hoisting the IDs here makes them visible everywhere, so feature:home can navigate to
+      destinations owned by :app (promo, confirm) and :feature:auth (the auth graph) by ID instead of
+      relying on implicit deep-link URI strings.
+    -->
+    <item type="id" name="dest_auth" />
+    <item type="id" name="dest_promo" />
+    <item type="id" name="dest_confirm" />
+</resources>

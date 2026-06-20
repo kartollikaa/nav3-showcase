@@ -6,15 +6,16 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import io.dodo.nav3.core.designsystem.R
 import io.dodo.nav3.core.designsystem.theme.Nav3ShowcaseTheme
 
 /**
  * Boilerplate that every Compose-in-fragment screen repeats: make a ComposeView, set the disposal
- * strategy, host the theme, then bridge clicks to the NavController. Cross-module navigation goes
- * through implicit deep-link URIs because action IDs live in another module's R class.
+ * strategy, host the theme, then bridge clicks to the NavController. Cross-module navigation uses
+ * shared destination resource IDs (declared in :core:designsystem, see navigation_ids.xml) — every
+ * module can see them, so we navigate by R.id instead of implicit deep-link URI strings.
  */
 class HomeFragment : Fragment() {
     override fun onCreateView(
@@ -26,9 +27,9 @@ class HomeFragment : Fragment() {
         setContent {
             Nav3ShowcaseTheme {
                 HomeScreen(
-                    onOpenAuth = { findNavController().navigate("app://auth".toUri()) },
-                    onOpenPromo = { findNavController().navigate("app://promo".toUri()) },
-                    onConfirm = { findNavController().navigate("app://confirm".toUri()) },
+                    onOpenAuth = { findNavController().navigate(R.id.dest_auth) },
+                    onOpenPromo = { findNavController().navigate(R.id.dest_promo) },
+                    onConfirm = { findNavController().navigate(R.id.dest_confirm) },
                 )
             }
         }

@@ -12,19 +12,17 @@
     <!-- The auth feature owns its OWN nested graph (per-feature nested navigation). -->
     <include app:graph="@navigation/nav_auth" />
 
-    <!-- A bottom sheet, the Navigation 2 way: a BottomSheetDialogFragment as a <dialog> destination. -->
+    <!-- A bottom sheet, the Navigation 2 way: a BottomSheetDialogFragment as a <dialog> destination.
+         Its id is the shared @id/dest_promo (declared in :core:designsystem) so feature:home can
+         navigate to it by resource id. -->
     <dialog
-        android:id="@+id/promoSheet"
+        android:id="@id/dest_promo"
         android:name="io.dodo.nav3.feature.home.PromoBottomSheetFragment"
-        android:label="Promo">
-        <deepLink app:uri="app://promo" />
-    </dialog>
+        android:label="Promo" />
 
-    <!-- A dialog destination (DialogFragment). -->
+    <!-- A dialog destination (DialogFragment), reached by the shared @id/dest_confirm. -->
     <dialog
-        android:id="@+id/confirmDialog"
+        android:id="@id/dest_confirm"
         android:name="io.dodo.nav3.feature.home.ConfirmDialogFragment"
-        android:label="Confirm">
-        <deepLink app:uri="app://confirm" />
-    </dialog>
+        android:label="Confirm" />
 </navigation>

@@ -11,16 +11,18 @@ Navigation 3 over the next three branches.
   - `PromoBottomSheetFragment` — a Material `BottomSheetDialogFragment` used as a `<dialog>` dest.
   - `ConfirmDialogFragment` — a `DialogFragment` dest.
 - `:feature:auth` — its **own nested nav graph** `nav_auth.xml`: `phone → sms → name`, each a Fragment.
-- Cross-module navigation uses **implicit deep-link URIs** (`app://auth`, `app://promo`, `app://confirm`)
-  because action IDs live in another module's generated `R` class and aren't visible across modules.
+- Cross-module navigation uses **shared destination resource IDs** (`dest_auth`, `dest_promo`,
+  `dest_confirm`) declared in `:core:designsystem` — a module every feature depends on. So `HomeFragment`
+  can `findNavController().navigate(R.id.dest_…)` to destinations owned by `:app` and `:feature:auth`.
+  (A destination's id is otherwise generated in the module that owns its graph XML and invisible to siblings.)
 
 ```
 NavHostFragment (nav_main)
 ├── homeFragment
-├── include(nav_auth)            ← feature-owned nested graph
+├── include(nav_auth)            ← feature-owned nested graph, @id/dest_auth
 │     └── phone → sms → name
-├── promoSheet   (BottomSheetDialogFragment, deepLink app://promo)
-└── confirmDialog(DialogFragment,            deepLink app://confirm)
+├── promoSheet   (BottomSheetDialogFragment, @id/dest_promo)
+└── confirmDialog(DialogFragment,            @id/dest_confirm)
 ```
 
 ## The pain points to point at during the talk (this is the motivation for Nav3)
@@ -30,7 +32,9 @@ NavHostFragment (nav_main)
 2. **The back stack is hidden.** It lives inside the `NavController`/`FragmentManager`. You can't
    inspect it as data or unit-test "what's on the stack".
 3. **Stringly-typed graph + IDs.** `R.id.action_phone_to_sms`, `@id/...`, XML graphs. Typos compile,
-   then crash at runtime. Multi-module forces deep-link URI strings to dodge cross-module `R`.
+   then crash at runtime. And because a destination's id is invisible outside its module, multi-module
+   navigation forces you to hoist shared `<item type="id">` constants into a common module just to call
+   `navigate(R.id.…)` across the boundary (or fall back to magic deep-link URI strings).
 4. **Shared state across a flow is awkward.** Passing the phone number to the SMS step needs Safe Args,
    a bundle, or a graph-scoped ViewModel. (We didn't even bother here — each step keeps local state.)
 5. **Two UI worlds.** Fragment lifecycle *and* composition lifecycle, bridged by `ComposeView`. Two

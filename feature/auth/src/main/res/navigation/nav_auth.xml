@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/nav_auth"
+    android:id="@id/dest_auth"
     app:startDestination="@id/phoneFragment">
 
     <fragment
         android:id="@+id/phoneFragment"
         android:name="io.dodo.nav3.feature.auth.PhoneFragment"
         android:label="Phone">
-        <!-- Entry point of the whole flow, reachable via an implicit deep link from other modules. -->
-        <deepLink app:uri="app://auth" />
+        <!-- Other modules navigate into this flow by the shared @id/dest_auth (this graph's id,
+             declared in :core:designsystem) instead of an implicit deep-link URI. -->
         <action
             android:id="@+id/action_phone_to_sms"
             app:destination="@id/smsFragment" />
