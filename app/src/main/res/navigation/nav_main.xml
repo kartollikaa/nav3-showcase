@@ -9,18 +9,13 @@
         android:name="io.dodo.nav3.feature.home.HomeFragment"
         android:label="Home" />
 
-    <!-- The auth feature owns its OWN nested graph (per-feature nested navigation). -->
+    <!-- Each feature owns its OWN nested graph (per-feature nested navigation). The catalog's
+         filter bottom sheet lives INSIDE the catalog graph — it belongs to the feature. -->
     <include app:graph="@navigation/nav_auth" />
+    <include app:graph="@navigation/nav_catalog" />
 
-    <!-- A bottom sheet, the Navigation 2 way: a BottomSheetDialogFragment as a <dialog> destination.
-         Its id is the shared @id/dest_promo (declared in :core:designsystem) so feature:home can
-         navigate to it by resource id. -->
-    <dialog
-        android:id="@id/dest_promo"
-        android:name="io.dodo.nav3.feature.home.PromoBottomSheetFragment"
-        android:label="Promo" />
-
-    <!-- A dialog destination (DialogFragment), reached by the shared @id/dest_confirm. -->
+    <!-- A dialog destination (DialogFragment), reached by the shared @id/dest_confirm. It stays in
+         root (:app) — the one overlay that remains here until the very end of the migration. -->
     <dialog
         android:id="@id/dest_confirm"
         android:name="io.dodo.nav3.feature.home.ConfirmDialogFragment"

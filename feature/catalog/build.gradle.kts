@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "io.dodo.nav3.feature.home"
+    namespace = "io.dodo.nav3.feature.catalog"
     compileSdk = 36
     defaultConfig { minSdk = 24 }
     compileOptions {
@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.google.android.material) // BottomSheetDialogFragment (the filter sheet)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

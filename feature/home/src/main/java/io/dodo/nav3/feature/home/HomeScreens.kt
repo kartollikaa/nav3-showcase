@@ -17,34 +17,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.dodo.nav3.core.designsystem.ContentGreen
-import io.dodo.nav3.core.designsystem.ContentMauve
 
 @Composable
 fun HomeScreen(
+    onOpenCatalog: () -> Unit,
     onOpenAuth: () -> Unit,
-    onOpenPromo: () -> Unit,
     onConfirm: () -> Unit,
 ) {
     ContentGreen(title = "Home — Fragments + Navigation 2") {
         Text("Each screen is a Fragment hosting a ComposeView. The NavController (Navigation 2) owns the back stack.")
-        Button(onClick = onOpenAuth, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-            Text("Start auth flow  (nested nav graph)")
+        Button(onClick = onOpenCatalog, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            Text("Open Catalog  (list → detail, filter sheet)")
         }
-        OutlinedButton(onClick = onOpenPromo, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Text("Show promo  (BottomSheetDialogFragment dest)")
+        OutlinedButton(onClick = onOpenAuth, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Start auth flow  (nested nav graph)")
         }
         OutlinedButton(onClick = onConfirm, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text("Confirm order  (DialogFragment dest)")
-        }
-    }
-}
-
-@Composable
-fun PromoSheet(onClose: () -> Unit) {
-    ContentMauve(title = "Promo") {
-        Text("50% off your next pizza.")
-        Button(onClick = onClose, modifier = Modifier.padding(top = 12.dp)) {
-            Text("Close")
         }
     }
 }

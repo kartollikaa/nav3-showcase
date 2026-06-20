@@ -30,6 +30,7 @@ kotlin {
 dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:catalog"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.fragment.ktx)

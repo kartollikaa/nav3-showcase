@@ -1,4 +1,4 @@
-package io.dodo.nav3.feature.home
+package io.dodo.nav3.feature.catalog
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -9,8 +9,8 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.dodo.nav3.core.designsystem.theme.Nav3ShowcaseTheme
 
-/** The Navigation 2 bottom sheet: a Material BottomSheetDialogFragment used as a <dialog> dest. */
-class PromoBottomSheetFragment : BottomSheetDialogFragment() {
+/** The catalog's filter, the Navigation 2 way: a Material BottomSheetDialogFragment as a <dialog> dest. */
+class FilterBottomSheetFragment : BottomSheetDialogFragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -19,7 +19,7 @@ class PromoBottomSheetFragment : BottomSheetDialogFragment() {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         setContent {
             Nav3ShowcaseTheme {
-                PromoSheet(onClose = { dismiss() })
+                FilterSheet(onApply = { dismiss() })
             }
         }
     }

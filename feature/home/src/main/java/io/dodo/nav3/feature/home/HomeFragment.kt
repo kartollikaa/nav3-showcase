@@ -27,8 +27,8 @@ class HomeFragment : Fragment() {
         setContent {
             Nav3ShowcaseTheme {
                 HomeScreen(
+                    onOpenCatalog = { findNavController().navigate(R.id.dest_catalog) },
                     onOpenAuth = { findNavController().navigate(R.id.dest_auth) },
-                    onOpenPromo = { findNavController().navigate(R.id.dest_promo) },
                     onConfirm = { findNavController().navigate(R.id.dest_confirm) },
                 )
             }
