@@ -1,0 +1,4 @@
+<resources>
+    <!-- Compose drives all UI; this XML theme only needs to be a no-action-bar shell. -->
+    <style name="Theme.Nav3Showcase" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
