@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.skydoves.navgraph)
 }
 
 android {
@@ -24,7 +26,9 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
-    debugImplementation(libs.compose.ui.tooling)
+    // navgraph's device-free renderer needs @Preview + the ComposeViewAdapter from ui-tooling.
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.ui.tooling)
 
     implementation(libs.androidx.navigation3.runtime) // entry / EntryProviderScope / NavBackStack / NavKey
     implementation(libs.kotlinx.serialization.core)

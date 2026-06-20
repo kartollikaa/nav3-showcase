@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.skydoves.navgraph)
 }
 
 android {
@@ -25,7 +27,9 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose) // LocalLifecycleOwner for the bottom-sheet recipe
-    debugImplementation(libs.compose.ui.tooling)
+    // navgraph's device-free renderer needs @Preview + the ComposeViewAdapter from ui-tooling.
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.ui.tooling)
 
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)  // SceneStrategy / OverlayScene for the filter sheet

@@ -16,6 +16,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
+import com.github.skydoves.navgraph.annotations.NavEdge
 import io.dodo.nav3.core.designsystem.theme.Nav3ShowcaseTheme
 import io.dodo.nav3.feature.auth.NameKey
 import io.dodo.nav3.feature.auth.PhoneKey
@@ -45,6 +46,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Cross-feature edges are declared here because :app is the only module that depends on home, catalog
+// AND auth. `from` is explicit (this function isn't a @NavDestination), so the navgraph processor
+// stitches these into the merged map drawn from each feature's own annotations.
+@NavEdge(from = HomeKey::class, to = CatalogList::class, label = "Open Catalog")
+@NavEdge(from = HomeKey::class, to = PhoneKey::class, label = "Start auth")
+@NavEdge(from = NameKey::class, to = HomeKey::class, label = "Finish")
 @Composable
 fun RootNavigation(modifier: Modifier = Modifier) {
     // ONE back stack for the entire app. Home, the catalog, the auth steps, and every overlay live here.

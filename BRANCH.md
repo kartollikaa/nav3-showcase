@@ -1,59 +1,63 @@
-# flow2/04-unified — One root NavDisplay, no more Fragments
+# flow2/05-navgraph-plugin — Draw the whole flow from annotations
 
-The destination. Home, the catalog (list/detail + filter), the auth steps, and the confirm dialog now
-all live on a **single back stack** rendered by **one root `NavDisplay`** in a plain `ComponentActivity`.
-Navigation 2, Fragments, the FragmentManager, and every XML nav graph are gone. The **host migrated
-last** — exactly the reverse-dependency order a real migration follows.
+Same app as `flow2/04-unified` at runtime — **nothing about navigation changed**. This branch adds
+[skydoves/compose-nav-graph](https://github.com/skydoves/compose-nav-graph): a Gradle plugin + KSP
+processor + Android Studio plugin that reads a few annotations and renders your **entire app flow as
+an interactive map** — every destination a node (with its rendered `@Preview` as a thumbnail), every
+transition a labelled arrow, every typed argument shown on the node.
 
-## What changed vs flow2/03
-- **Deleted** every Fragment host (`HomeFragment`, `CatalogFragment`, `AuthFragment`,
-  `ConfirmDialogFragment`), all XML graphs (`nav_main`, `nav_catalog`, `nav_auth`), the activity layout,
-  and the shared `navigation_ids.xml` (no Nav2 resIds left to bridge modules).
-- `:app` is a `ComponentActivity` with `setContent { … RootNavigation() }` — a single `NavDisplay`.
-- Each feature exposes an `EntryProviderScope<NavKey>` builder — `homeEntries`, `catalogEntries`,
-  `authEntries` — the Nav3 **modularization** pattern. The app calls all three in one `entryProvider { }`.
-- The **catalog filter** stays a `BottomSheetSceneStrategy` overlay; the **confirm dialog** becomes a
-  `DialogSceneStrategy.dialog()` entry in root. Both are **scenes on the one display**, not separate hosts.
-- `:app`, `:feature:home`, `:feature:catalog`, `:feature:auth` dropped their Fragment / Navigation 2 /
-  Material Components dependencies; the app theme is back to a plain `android:Theme.Material.Light.NoActionBar`.
+It is a **documentation/visualization** tool, not a navigation library: it generates no runtime code;
+a "route" is any class (it doesn't need to implement `NavKey`). KSP extracts the graph to
+`nav-graph.json`, the Gradle plugin renders thumbnails, and the IDE plugin draws the canvas.
 
-## The whole app's navigation, in one place
+## What changed vs `flow2/04-unified`
+- **Build:** added KSP (`2.2.21-2.0.5`) and the navgraph plugin (`0.1.2`) to the version catalog, and
+  applied both to `:feature:home`, `:feature:catalog`, `:feature:auth`, and `:app`. The plugin auto-adds
+  the annotations + KSP processor. `ui-tooling` is promoted to a full `implementation` in the feature
+  modules (the device-free renderer needs `ComposeViewAdapter`).
+- **Annotations only** on existing code — no navigation logic touched.
+
+## The four annotations
 ```kotlin
-val backStack = rememberNavBackStack(HomeKey)   // ONE stack for the entire app
+// 1) The keys ARE the graph — annotate the route classes with structure.
+@NavGraphRoot                                          // the start destination
+@NavEdge(to = ConfirmKey::class, label = "Confirm order")
+@Serializable data object HomeKey : NavKey
 
-NavDisplay(
-    backStack = backStack,
-    onBack = { backStack.removeLastOrNull() },
-    entryDecorators = listOf(
-        rememberSaveableStateHolderNavEntryDecorator(),
-        rememberViewModelStoreNavEntryDecorator(),
-    ),
-    sceneStrategies = listOf(bottomSheetStrategy, DialogSceneStrategy()),
-    entryProvider = entryProvider {
-        homeEntries(backStack, onOpenCatalog = { backStack.add(CatalogList) }, onOpenAuth = { backStack.add(PhoneKey) })
-        catalogEntries(backStack)                                  // list → detail + filter sheet
-        authEntries(backStack, onComplete = { _, _ -> /* pop auth sub-flow */ })
-    },
-)
+// 2) Link each route to the composable that renders it (the node's click target).
+@NavDestination(route = CatalogList::class)
+@Composable fun ProductListScreen(/* … */) { /* … */ }
+
+// 3) Link a @Preview to a route so its rendered image becomes the node's thumbnail.
+@NavPreview(route = CatalogList::class, primary = true)
+@Preview @Composable private fun ProductListPreview() = Nav3ShowcaseTheme { ProductListScreen(/* stubs */) }
 ```
 
-### Modularization pattern
-A feature owns its keys and an extension on `EntryProviderScope<NavKey>`. The app composes them inside
-one `entryProvider { }`. A feature never depends on another feature; cross-feature jumps are wired in
-the app (the only module that sees all keys), passed as lambdas. At scale you'd register these builders
-with Dagger multibindings (`@IntoSet`) and `forEach` them — no central list to maintain.
+## The map it draws — 8 nodes, 8 edges
+- **Start:** `HomeKey`.
+- **Intra-feature edges** on the route classes (same module): `HomeKey → ConfirmKey`;
+  `CatalogList → ProductDetail`, `CatalogList → FilterKey`; `PhoneKey → SmsKey`, `SmsKey → NameKey`.
+- **Cross-feature edges** in `:app` (`RootNavigation`, explicit `from`/`to`): `HomeKey → CatalogList`,
+  `HomeKey → PhoneKey`, `NameKey → HomeKey` — `:app` is the only module that sees every feature's keys.
+- **Typed-argument arrows:** `ProductDetail.id`, `SmsKey.phone`, `NameKey.phone`/`code` (serializable
+  properties become args automatically — the type IS the contract).
+- **Thumbnails:** all 8 nodes link a no-arg `@Preview` via `@NavPreview`.
 
-## The migration, end to end (the point of this flow)
-1. **flow2/01** — everything Nav2 + Fragments; a leaf feature (Catalog) and a root dialog in place.
-2. **flow2/02** — migrate the **Catalog** feature (its nav + bottom sheet) to a local Nav3 island.
-3. **flow2/03** — migrate the **auth** flow to Nav3; typed data flows phone → sms → name.
-4. **flow2/04** — migrate the **host**: collapse the islands into one root `NavDisplay`; the confirm
-   dialog (last overlay in root) becomes a `DialogSceneStrategy` scene. From the leaves to the root.
+## Requirements / gotcha
+- The graph (`nav-graph.json`, KSP) builds on the project's normal **JDK 17** toolchain; `assembleDebug`
+  is unchanged and green.
+- **Thumbnail rendering needs JDK 21.** The navgraph layoutlib renderer ships compiled for Java 21
+  (`class file version 65.0`); on JDK 17 the render step fails and you get the graph with no thumbnails.
+  Run Android Studio / Gradle on a JDK 21 to render them. No AGP / Kotlin / Gradle / compileSdk change.
 
 ## 🎤 Speaker cues
-- `git diff flow2/03 flow2/04 --stat` — watch fragments, layouts and nav XML get deleted.
-- Open `MainActivity.kt`: "This is the whole app's navigation. One stack, two scene strategies, three feature builders."
-- Run the full app: home → Catalog (list → detail, filter sheet) → back; home → auth (phone → sms →
-  name) → finish; home → confirm dialog. All one back stack; system/predictive back works throughout.
-- "We migrated leaves first (catalog, auth) and the host last — so each step was small and the outer
-  shell kept working the whole time."
+- `git diff flow2/04 flow2/05 --stat` — "no navigation code changed; it's all annotations + plugin wiring."
+- Open `HomeKeys.kt` / `CatalogKeys.kt`: "The keys *are* the graph. `@NavGraphRoot` + `@NavEdge` and the map draws itself."
+- `./gradlew :app:generateNavGraph` (on JDK 21) → open the **NavGraph** tool window: the live map with
+  thumbnails, typed-argument arrows, and the cross-feature `Open Catalog` / `Start auth` / `Finish` edges.
+- The honest caveat: "this doesn't change how you navigate; it makes the navigation you already have
+  *visible and reviewable*."
+
+## Try it
+`./gradlew :app:generateNavGraph` then open the project in Android Studio (JDK 21) and the **NavGraph
+Graph** tool window. Or inspect `app/build/navgraph-aggregated/nav-graph.json` directly.

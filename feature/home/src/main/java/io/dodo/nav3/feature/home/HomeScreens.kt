@@ -15,9 +15,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.github.skydoves.navgraph.annotations.NavDestination
+import com.github.skydoves.navgraph.annotations.NavPreview
 import io.dodo.nav3.core.designsystem.ContentGreen
+import io.dodo.nav3.core.designsystem.theme.Nav3ShowcaseTheme
 
+@NavDestination(route = HomeKey::class)
 @Composable
 fun HomeScreen(
     onOpenCatalog: () -> Unit,
@@ -38,6 +43,7 @@ fun HomeScreen(
     }
 }
 
+@NavDestination(route = ConfirmKey::class)
 @Composable
 fun ConfirmDialogContent(onYes: () -> Unit, onNo: () -> Unit) {
     Surface(shape = MaterialTheme.shapes.large) {
@@ -54,3 +60,14 @@ fun ConfirmDialogContent(onYes: () -> Unit, onNo: () -> Unit) {
         }
     }
 }
+
+// ── @NavPreview thumbnails ─────────────────────────────────────────────────────────────────────
+@NavPreview(route = HomeKey::class, primary = true)
+@Preview
+@Composable
+private fun HomeScreenPreview() = Nav3ShowcaseTheme { HomeScreen(onOpenCatalog = {}, onOpenAuth = {}, onConfirm = {}) }
+
+@NavPreview(route = ConfirmKey::class, primary = true)
+@Preview
+@Composable
+private fun ConfirmDialogPreview() = Nav3ShowcaseTheme { ConfirmDialogContent(onYes = {}, onNo = {}) }

@@ -18,6 +18,10 @@ lifecycleViewmodelNav3 = "2.10.0"
 kotlinxSerializationCore = "1.9.0"
 material3AdaptiveNav3 = "1.3.0-alpha09"
 
+# --- Nav-graph visualization plugin (flow2/05 only): skydoves/compose-nav-graph ---
+ksp = "2.2.21-2.0.5"            # KSP release matching Kotlin 2.2.21
+composeNavGraph = "0.1.2"
+
 # --- Navigation 2 (used ONLY by the migration flow's baseline branch) ---
 navigation2 = "2.9.5"
 fragment = "1.8.9"
@@ -60,3 +64,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+# Nav-graph visualization (flow2/05 only)
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+skydoves-navgraph = { id = "com.github.skydoves.navgraph", version.ref = "composeNavGraph" }
