@@ -24,3 +24,4 @@ rootProject.name = "nav3-showcase"
 
 include(":app")
 include(":core:designsystem")
+include(":feature:catalog")

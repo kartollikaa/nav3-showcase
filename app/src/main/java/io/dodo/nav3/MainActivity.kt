@@ -4,21 +4,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.entry
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import io.dodo.nav3.core.designsystem.theme.Nav3ShowcaseTheme
+import io.dodo.nav3.feature.catalog.ProductDetail
+import io.dodo.nav3.feature.catalog.ProductList
+import io.dodo.nav3.feature.catalog.ProductListScreen
+import io.dodo.nav3.feature.catalog.ProductDetailScreen
 
-/**
- * `main` branch entry point. There is no navigation here on purpose — `main` only carries the
- * shared scaffold (build setup + design system). Each concept lives on its own branch.
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -26,25 +25,39 @@ class MainActivity : ComponentActivity() {
         setContent {
             Nav3ShowcaseTheme {
                 Scaffold { padding ->
-                    Column(Modifier.padding(padding).padding(24.dp)) {
-                        Text("Navigation 3 Showcase", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "You're on `main` (shared scaffold only).\n\n" +
-                                "Intro flow (complexity rising):\n" +
-                                "  • flow1/01-basics\n" +
-                                "  • flow1/02-scenes\n" +
-                                "  • flow1/03-viewmodel-decorator\n\n" +
-                                "Migration flow (Nav2 → Nav3):\n" +
-                                "  • flow2/01-nav2-baseline\n" +
-                                "  • flow2/02-nav3-bottomsheet\n" +
-                                "  • flow2/03-nav3-auth-flow\n" +
-                                "  • flow2/04-unified",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
+                    CatalogNavigation(Modifier.padding(padding))
                 }
             }
         }
     }
+}
+
+/**
+ * This is the ENTIRE navigation setup for branch 1. Read it top to bottom — there is no hidden
+ * framework state anywhere.
+ */
+@Composable
+fun CatalogNavigation(modifier: Modifier = Modifier) {
+    // (1) The back stack is a plain observable list that WE own.
+    //     rememberNavBackStack additionally saves/restores it across config changes & process death.
+    val backStack = rememberNavBackStack(ProductList)
+
+    // (2) NavDisplay observes that list and renders the entry on top.
+    NavDisplay(
+        backStack = backStack,
+        modifier = modifier,
+        // (3) "Back" is just: remove the last key from the list.
+        onBack = { backStack.removeLastOrNull() },
+        // (4) entryProvider maps a key -> the content to show for it.
+        entryProvider = entryProvider {
+            entry<ProductList> {
+                // "Navigate forward" is just: add a key to the list.
+                ProductListScreen(onProductClick = { id -> backStack.add(ProductDetail(id)) })
+            }
+            entry<ProductDetail> { key ->
+                // The key is fully typed: key.id is a String, guaranteed by the compiler.
+                ProductDetailScreen(id = key.id, onBack = { backStack.removeLastOrNull() })
+            }
+        },
+    )
 }
