@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_main"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="io.dodo.nav3.feature.home.HomeFragment"
+        android:label="Home" />
+
+    <!-- The auth feature owns its OWN nested graph (per-feature nested navigation). -->
+    <include app:graph="@navigation/nav_auth" />
+
+    <!-- A bottom sheet, the Navigation 2 way: a BottomSheetDialogFragment as a <dialog> destination. -->
+    <dialog
+        android:id="@+id/promoSheet"
+        android:name="io.dodo.nav3.feature.home.PromoBottomSheetFragment"
+        android:label="Promo">
+        <deepLink app:uri="app://promo" />
+    </dialog>
+
+    <!-- A dialog destination (DialogFragment). -->
+    <dialog
+        android:id="@+id/confirmDialog"
+        android:name="io.dodo.nav3.feature.home.ConfirmDialogFragment"
+        android:label="Confirm">
+        <deepLink app:uri="app://confirm" />
+    </dialog>
+</navigation>
