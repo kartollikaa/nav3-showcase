@@ -2,32 +2,13 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@id/dest_catalog"
-    app:startDestination="@id/catalogListFragment">
+    app:startDestination="@id/catalogFragment">
 
-    <!-- Entry point of the feature. Other modules navigate here by the shared @id/dest_catalog
-         (this graph's id, declared in :core:designsystem) — by resource id, not a deep-link URI. -->
+    <!-- One Nav2 destination now. Everything INSIDE the catalog (list -> product, the filter sheet)
+         moved into a Nav3 NavDisplay hosted by this fragment. Other modules still reach the catalog by
+         the shared @id/dest_catalog (this graph's id, declared in :core:designsystem). -->
     <fragment
-        android:id="@+id/catalogListFragment"
-        android:name="io.dodo.nav3.feature.catalog.CatalogListFragment"
-        android:label="Catalog">
-        <action
-            android:id="@+id/action_catalogList_to_product"
-            app:destination="@id/productFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/productFragment"
-        android:name="io.dodo.nav3.feature.catalog.ProductFragment"
-        android:label="Product">
-        <argument
-            android:name="id"
-            app:argType="string" />
-    </fragment>
-
-    <!-- The filter — a Material BottomSheetDialogFragment as a <dialog> destination, reached from the
-         list by this module's own @id/filterBottomSheetFragment. -->
-    <dialog
-        android:id="@+id/filterBottomSheetFragment"
-        android:name="io.dodo.nav3.feature.catalog.FilterBottomSheetFragment"
-        android:label="Filter" />
+        android:id="@+id/catalogFragment"
+        android:name="io.dodo.nav3.feature.catalog.CatalogFragment"
+        android:label="Catalog" />
 </navigation>
