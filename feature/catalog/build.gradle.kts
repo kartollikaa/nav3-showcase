@@ -33,4 +33,5 @@ dependencies {
     // NavKey lives in the runtime artifact; @Serializable comes from the kotlin serialization plugin.
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 }

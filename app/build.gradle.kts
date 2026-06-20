@@ -56,4 +56,7 @@ dependencies {
     // Material adaptive scenes (list-detail multipane)
     implementation(libs.compose.material3.adaptive)
     implementation(libs.androidx.material3.adaptive.navigation3)
+    // Per-NavEntry ViewModel scoping
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }

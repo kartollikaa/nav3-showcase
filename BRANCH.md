@@ -1,48 +1,75 @@
-# flow1/02-scenes — Bottom sheets & multipane, without changing the back stack
+# flow1/03-viewmodel-decorator — Scoping a ViewModel to a destination
 
-**Goal:** add real layout complexity (an overlay bottom sheet + an adaptive two-pane list/detail)
-and show that it's all done by **scene strategies**, not by changing how you navigate.
+**Goal:** make each destination own its ViewModel, so the VM is **created when you navigate to the
+screen and cleared when you leave it** — and show what goes wrong without this.
 
-## What changed vs `flow1/01-basics`
-- Added a copied-in **`BottomSheetSceneStrategy`** recipe (`app/.../scene/BottomSheetSceneStrategy.kt`).
-- Added a `Filter` destination rendered as a bottom sheet via metadata.
-- Wrapped list/detail with Material's adaptive **`ListDetailSceneStrategy`** so they go side-by-side on wide screens.
-- `NavDisplay` now takes `sceneStrategies = listOf(...)`. The back stack code is otherwise identical.
+## What changed vs `flow1/02-scenes`
+- `:feature:catalog` gained a `ProductDetailViewModel`, a `ProductRepository`, and a manual-DI
+  `CatalogGraph` (the "Dagger seam").
+- `NavDisplay` now passes `entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator())`.
+- The `ProductDetail` entry builds its VM with `viewModel { ProductDetailViewModel(...) }`.
 
-## The mental model: Scenes decide *layout*, the back stack stays the same
+## The one line that matters
 
 ```kotlin
-val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
-val bottomSheetStrategy = remember { BottomSheetSceneStrategy<NavKey>() }
-
 NavDisplay(
-    backStack = backStack,
-    onBack = { backStack.removeLastOrNull() },
-    sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy), // tried in order; first match wins
+    entryDecorators = listOf(
+        rememberSaveableStateHolderNavEntryDecorator(), // must be first; powers rememberSaveable {}
+        rememberViewModelStoreNavEntryDecorator(),      // ← gives each NavEntry its own ViewModelStore
+    ),
+    /* … */
     entryProvider = entryProvider {
-        entry<ProductList>(metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { … })) { … }
-        entry<ProductDetail>(metadata = ListDetailSceneStrategy.detailPane()) { … }
-        entry<Filter>(metadata = BottomSheetSceneStrategy.bottomSheet()) { … }   // overlay
+        entry<ProductDetail> { key ->
+            val vm = viewModel { ProductDetailViewModel(CatalogGraph.productRepository, key.id) }
+            ProductDetailScreen(product = vm.product, clicks = vm.clicks, /* … */)
+        }
     },
 )
 ```
 
-Key points:
-- A **`SceneStrategy`** inspects the back stack and returns a `Scene` (a way to render one or more entries together). `NavDisplay` tries your strategies in order and falls back to single-pane if none apply.
-- An entry **opts in** to a scene through `metadata` (`listPane()`, `detailPane()`, `bottomSheet()`). The screen composable doesn't know or care.
-- **Order matters.** Overlay strategies (bottom sheet, dialog) must come first so they draw on top of the layout beneath them.
-- **Bottom sheets are a recipe, not core.** There is no `androidx` `BottomSheetSceneStrategy`; you copy the official one in. (Dialogs *are* core: `DialogSceneStrategy`.)
+### What a decorator is
+A `NavEntryDecorator` wraps the content of **every** entry — a place to install per-entry
+infrastructure via `CompositionLocalProvider` and to clean up when the entry is popped. Nav3 ships two
+you should almost always use, in this order:
+
+1. **`rememberSaveableStateHolderNavEntryDecorator()`** — must be first. It wraps each entry in a
+   `SaveableStateProvider` so `rememberSaveable {}` inside your screens is keyed per entry and
+   survives config changes / process death.
+2. **`rememberViewModelStoreNavEntryDecorator()`** (from `androidx.lifecycle:lifecycle-viewmodel-navigation3`)
+   — installs a dedicated `ViewModelStoreOwner` per entry. `viewModel()` inside that entry now resolves
+   to a store that lives exactly as long as the entry is on the back stack, and is **`clear()`-ed when
+   the entry is popped** (your `onCleared()` runs).
+
+> Naming note for the talk: earlier Nav3 alphas split this into `rememberSceneSetupNavEntryDecorator` /
+> `rememberSavedStateNavEntryDecorator`. On stable (1.x) the two above are the canonical decorators. If
+> your slides have the old names, this is the rename to mention.
 
 ## Why it matters
-- **Adaptive UI is a navigation concern handled declaratively.** The same back stack (`[ProductList, ProductDetail]`) renders as two stacked screens on a phone and as two panes on a tablet/foldable — no separate navigation graphs, no `if (isTablet)` branching in your screens.
-- **A bottom sheet is a real back-stack entry.** System back / predictive back dismiss it for free, and it survives config changes, because it's just another `NavEntry` — not an ad-hoc `ModalBottomSheet` boolean state hanging off a screen.
+- **Correct lifecycle = correct memory & state.** The detail VM (and its `viewModelScope` coroutines,
+  flows, observers) is torn down the moment the user backs out of that screen — not when the Activity
+  finally dies.
+- **Per-instance state.** Open *apple*, then "open another product" → *banana*. Each `ProductDetail`
+  entry gets its **own** VM instance (watch the `VM #n` label and the `Nav3VMScope` logcat tag).
+  Their `clicks` counters are independent.
+- **Survives rotation.** Increment a few times, rotate the device — the count stays, because the VM
+  outlives configuration changes while the entry is alive.
 
-## What breaks if you do it the old way
-- Nav2 had no first-class multipane; you hand-rolled `if (twoPane)` layouts and juggled two `NavHost`s or a fragment + detail container, keeping their state in sync manually.
-- Bottom sheets were typically local `var showSheet by remember { mutableStateOf(false) }` — invisible to the back stack, easy to get wrong with predictive back, and not restored after process death.
+## What breaks if you DON'T add `rememberViewModelStoreNavEntryDecorator`
+Without it, `viewModel()` falls back to the nearest `ViewModelStoreOwner` — the **Activity**. Two failures:
+
+1. **State bleed.** `viewModel()` keyed only by type returns the *same* `ProductDetailViewModel` for
+   *apple* and *banana*. Open apple (clicks = 5), open banana → it still shows 5, and writes collide.
+   You'd have to invent a manual keying scheme to work around it.
+2. **Leaks / stale work.** The VM is never cleared when you leave the screen; it (and any running
+   `viewModelScope` jobs, collectors, cached data) lives until the Activity is destroyed. On a deep or
+   looping back stack that's a growing pile of zombie ViewModels.
+
+To demo it live: comment out the `rememberViewModelStoreNavEntryDecorator()` line, rerun, and bounce
+between apple and banana — the counter and `VM #n` label stop being per-product.
 
 ## 🎤 Speaker cues
-- Run on a phone: tap a product (it pushes a detail screen). Now **rotate to landscape / run on a tablet / resize a foldable** — the *same* navigation state snaps into two panes. "I changed zero lines of navigation to get this."
-- Open the filter: show that **system back dismisses the sheet** because it's a back-stack entry.
-- Point at `sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy)` and explain the order rule (overlays first).
-- Note for the team: "Bottom sheet = copy the recipe; dialog = `DialogSceneStrategy` is built in."
+- Open logcat filtered to `Nav3VMScope`. Push apple → "created VM #1". "Open another" → banana → "created VM #2".
+  Press back → "cleared VM #2". *"Lifecycle is automatic and tied to the back stack."*
+- Increment on apple, **rotate** → count survives (config change) but the VM isn't leaked across screens.
+- The reveal: delete the one decorator line, rerun, show the counter bleeding between products. Put it back.
+- Tie to DI: *"Dagger builds the object; Navigation 3 owns when it lives and dies. Those are different jobs."*

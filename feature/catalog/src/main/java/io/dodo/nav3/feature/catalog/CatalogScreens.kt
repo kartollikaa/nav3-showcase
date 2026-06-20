@@ -32,11 +32,32 @@ fun ProductListScreen(
     }
 }
 
+/**
+ * The screen takes plain state + callbacks. It has NO idea a ViewModel exists — the entry in
+ * MainActivity creates the VM and feeds it in. That keeps the screen previewable and lets the
+ * ViewModel's lifetime be owned by navigation.
+ */
 @Composable
-fun ProductDetailScreen(id: String, onBack: () -> Unit) {
-    ContentBlue(title = "Product: $id") {
-        Button(onClick = onBack, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Back")
+fun ProductDetailScreen(
+    product: Product,
+    clicks: Int,
+    debugLabel: String,
+    onIncrement: () -> Unit,
+    onOpenAnother: () -> Unit,
+    onBack: () -> Unit,
+) {
+    ContentBlue(title = "Product: ${product.name}") {
+        Text(product.description)
+        Text("Clicks held by this entry's ViewModel: $clicks")
+        Text("($debugLabel)")
+        Button(onClick = onIncrement, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Increment (writes to THIS entry's ViewModel)")
+        }
+        OutlinedButton(onClick = onOpenAnother, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Open another product (pushes a new entry → new VM)")
+        }
+        Button(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Back (pops this entry → its VM is cleared)")
         }
     }
 }
