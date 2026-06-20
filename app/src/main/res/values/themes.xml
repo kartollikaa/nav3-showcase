@@ -1,4 +1,4 @@
 <resources>
-    <!-- Fragment app: BottomSheetDialogFragment + Material widgets need a Material3 host theme. -->
-    <style name="Theme.Nav3Showcase" parent="Theme.Material3.DayNight.NoActionBar" />
+    <!-- Pure Compose UI; a no-action-bar platform theme is all the Activity needs. -->
+    <style name="Theme.Nav3Showcase" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

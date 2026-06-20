@@ -1,51 +1,59 @@
-# flow2/03-nav3-auth-flow — Migrate the auth flow to Navigation 3
+# flow2/04-unified — One root NavDisplay, no more Fragments
 
-Second feature migrated. The **auth flow** (`phone → sms → name`) — previously three Fragments wired
-by an XML nested graph with **no data flowing between steps** — is now a single `AuthFragment` hosting
-a Nav3 `NavDisplay` over three typed keys. The **Catalog feature is already on Nav3** (previous
-branch). The **host (home) and the root confirm dialog are still Navigation 2** — the host migrates last.
+The destination. Home, the catalog (list/detail + filter), the auth steps, and the confirm dialog now
+all live on a **single back stack** rendered by **one root `NavDisplay`** in a plain `ComponentActivity`.
+Navigation 2, Fragments, the FragmentManager, and every XML nav graph are gone. The **host migrated
+last** — exactly the reverse-dependency order a real migration follows.
 
-## What changed vs flow2/02
-- `:feature:auth`: `PhoneFragment` / `SmsFragment` / `NameFragment` + the `phone→sms→name` XML actions
-  collapse into:
-  - `AuthFragment` — one host Fragment with a Nav3 `NavDisplay` (`AuthNavigation`).
-  - Typed keys carrying data forward: `PhoneKey → SmsKey(phone) → NameKey(phone, code)`.
-  - `AuthScreens` now pass their value to the next step (`onNext: (String) -> Unit`) instead of the
-    Nav2 version's no-arg callbacks.
-  - `nav_auth.xml` shrinks to a single `authFragment` (still `@id/dest_auth`).
-- Deps: `:feature:auth` gains `navigation3-runtime/ui`, `kotlinx-serialization-core` + the
-  serialization plugin; keeps `navigation-fragment-ktx` only to **exit** the feature.
-- **Untouched:** the catalog (already Nav3), home, the root confirm dialog.
+## What changed vs flow2/03
+- **Deleted** every Fragment host (`HomeFragment`, `CatalogFragment`, `AuthFragment`,
+  `ConfirmDialogFragment`), all XML graphs (`nav_main`, `nav_catalog`, `nav_auth`), the activity layout,
+  and the shared `navigation_ids.xml` (no Nav2 resIds left to bridge modules).
+- `:app` is a `ComponentActivity` with `setContent { … RootNavigation() }` — a single `NavDisplay`.
+- Each feature exposes an `EntryProviderScope<NavKey>` builder — `homeEntries`, `catalogEntries`,
+  `authEntries` — the Nav3 **modularization** pattern. The app calls all three in one `entryProvider { }`.
+- The **catalog filter** stays a `BottomSheetSceneStrategy` overlay; the **confirm dialog** becomes a
+  `DialogSceneStrategy.dialog()` entry in root. Both are **scenes on the one display**, not separate hosts.
+- `:app`, `:feature:home`, `:feature:catalog`, `:feature:auth` dropped their Fragment / Navigation 2 /
+  Material Components dependencies; the app theme is back to a plain `android:Theme.Material.Light.NoActionBar`.
 
-## The win this branch shows: typed data flow
-Nav2 here never passed the phone number forward — each step kept local state (a documented pain point
-in flow2/01). Nav3 makes it the type system's job:
+## The whole app's navigation, in one place
 ```kotlin
-entry<PhoneKey> { PhoneScreen(onNext = { phone -> backStack.add(SmsKey(phone)) }) }
-entry<SmsKey>   { key -> SmsScreen(phone = key.phone, onNext = { code -> backStack.add(NameKey(key.phone, code)) }) }
-entry<NameKey>  { key -> NameScreen(onFinish = { name -> onAuthComplete(key.phone, name) }) }
-```
-No Safe Args, no Bundle, no graph-scoped ViewModel — just typed constructor arguments.
+val backStack = rememberNavBackStack(HomeKey)   // ONE stack for the entire app
 
-## The shape
-```
-NavHostFragment (nav_main)  — Navigation 2 host
-├── homeFragment                                                                  (still Nav2)
-├── include(nav_catalog)  @id/dest_catalog → CatalogFragment → Nav3 NavDisplay   (Nav3, branch 02)
-├── include(nav_auth)     @id/dest_auth   → AuthFragment    → Nav3 NavDisplay    (Nav3, THIS branch)
-│        PhoneKey → SmsKey(phone) → NameKey(phone, code)
-└── confirmDialog         @id/dest_confirm                                        (still Nav2, in root)
+NavDisplay(
+    backStack = backStack,
+    onBack = { backStack.removeLastOrNull() },
+    entryDecorators = listOf(
+        rememberSaveableStateHolderNavEntryDecorator(),
+        rememberViewModelStoreNavEntryDecorator(),
+    ),
+    sceneStrategies = listOf(bottomSheetStrategy, DialogSceneStrategy()),
+    entryProvider = entryProvider {
+        homeEntries(backStack, onOpenCatalog = { backStack.add(CatalogList) }, onOpenAuth = { backStack.add(PhoneKey) })
+        catalogEntries(backStack)                                  // list → detail + filter sheet
+        authEntries(backStack, onComplete = { _, _ -> /* pop auth sub-flow */ })
+    },
+)
 ```
 
-## Back behaviour across the seam
-`NavDisplay` consumes system back while the auth stack has more than one entry (name → sms → phone).
-On the first step it stops consuming, so back falls through to the outer Nav2 `NavController`, which
-exits the feature to Home. `AuthFragment` bridges out on completion with `findNavController().popBackStack()`.
+### Modularization pattern
+A feature owns its keys and an extension on `EntryProviderScope<NavKey>`. The app composes them inside
+one `entryProvider { }`. A feature never depends on another feature; cross-feature jumps are wired in
+the app (the only module that sees all keys), passed as lambdas. At scale you'd register these builders
+with Dagger multibindings (`@IntoSet`) and `forEach` them — no central list to maintain.
+
+## The migration, end to end (the point of this flow)
+1. **flow2/01** — everything Nav2 + Fragments; a leaf feature (Catalog) and a root dialog in place.
+2. **flow2/02** — migrate the **Catalog** feature (its nav + bottom sheet) to a local Nav3 island.
+3. **flow2/03** — migrate the **auth** flow to Nav3; typed data flows phone → sms → name.
+4. **flow2/04** — migrate the **host**: collapse the islands into one root `NavDisplay`; the confirm
+   dialog (last overlay in root) becomes a `DialogSceneStrategy` scene. From the leaves to the root.
 
 ## 🎤 Speaker cues
-- `git diff flow2/02 flow2/03 --stat` — "second feature; the host is still untouched."
-- Open `AuthNavigation.kt`: "Three Fragments and an XML graph became three typed keys on one back
-  stack — and now the phone number actually flows to the SMS step, for free."
-- On device: home → auth → phone → sms (note "Code sent to …") → name → finish → back at home.
-- "Two features on Nav3 now, both as islands inside the Nav2 host. Next branch: we migrate the host
-  itself and collapse the islands into one root NavDisplay."
+- `git diff flow2/03 flow2/04 --stat` — watch fragments, layouts and nav XML get deleted.
+- Open `MainActivity.kt`: "This is the whole app's navigation. One stack, two scene strategies, three feature builders."
+- Run the full app: home → Catalog (list → detail, filter sheet) → back; home → auth (phone → sms →
+  name) → finish; home → confirm dialog. All one back stack; system/predictive back works throughout.
+- "We migrated leaves first (catalog, auth) and the host last — so each step was small and the outer
+  shell kept working the whole time."

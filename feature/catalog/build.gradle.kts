@@ -21,16 +21,13 @@ kotlin { jvmToolchain(17) }
 dependencies {
     implementation(project(":core:designsystem"))
 
-    implementation(libs.androidx.fragment.ktx) // CatalogFragment is still a destination in the outer Nav2 graph
-
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose) // LocalLifecycleOwner for the bottom-sheet recipe
     debugImplementation(libs.compose.ui.tooling)
 
-    // --- Navigation 3 — introduced here for the catalog's internal nav + filter sheet ---
     implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.navigation3.ui)  // SceneStrategy / OverlayScene for the filter sheet
     implementation(libs.kotlinx.serialization.core)
 }

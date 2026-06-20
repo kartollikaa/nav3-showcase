@@ -24,16 +24,16 @@ fun HomeScreen(
     onOpenAuth: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    ContentGreen(title = "Home — Fragments + Navigation 2") {
-        Text("Each screen is a Fragment hosting a ComposeView. The NavController (Navigation 2) owns the back stack.")
+    ContentGreen(title = "Home — one root NavDisplay (Nav3)") {
+        Text("No Fragments, no FragmentManager, no XML graphs. Home, the catalog, the auth steps, and every overlay share one back stack.")
         Button(onClick = onOpenCatalog, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
             Text("Open Catalog  (list → detail, filter sheet)")
         }
         OutlinedButton(onClick = onOpenAuth, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Text("Start auth flow  (nested nav graph)")
+            Text("Start auth flow  (phone → sms → name)")
         }
         OutlinedButton(onClick = onConfirm, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Text("Confirm order  (DialogFragment dest)")
+            Text("Confirm order  (dialog scene)")
         }
     }
 }
@@ -44,7 +44,7 @@ fun ConfirmDialogContent(onYes: () -> Unit, onNo: () -> Unit) {
         Column(Modifier.padding(24.dp)) {
             Text("Place order?", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))
-            Text("A DialogFragment destination hosting Compose.")
+            Text("A dialog destination, rendered by DialogSceneStrategy on the root back stack.")
             Spacer(Modifier.height(16.dp))
             Row {
                 TextButton(onClick = onNo) { Text("Cancel") }
