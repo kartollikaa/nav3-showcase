@@ -1,25 +1,25 @@
-# flow2/04-unified — One root NavDisplay, no more Fragments
+# flow2/04-unified — Один корневой NavDisplay, фрагменты уходят
 
-The destination. Home, the catalog (list/detail + filter), the auth steps, and the confirm dialog now
-all live on a **single back stack** rendered by **one root `NavDisplay`** in a plain `ComponentActivity`.
-Navigation 2, Fragments, the FragmentManager, and every XML nav graph are gone. The **host migrated
-last** — exactly the reverse-dependency order a real migration follows.
+Финал. Главный экран, каталог (список/детали + фильтр), шаги авторизации и диалог подтверждения теперь
+живут в **одном бэкстеке**, который отображает **один корневой `NavDisplay`** в обычной `ComponentActivity`.
+Navigation 2, фрагменты, FragmentManager и все XML-графы навигации — в прошлом. **Хост мигрировал
+последним** — именно в том порядке, обратном зависимостям, которому следует реальная миграция.
 
-## What changed vs flow2/03
-- **Deleted** every Fragment host (`HomeFragment`, `CatalogFragment`, `AuthFragment`,
-  `ConfirmDialogFragment`), all XML graphs (`nav_main`, `nav_catalog`, `nav_auth`), the activity layout,
-  and the shared `navigation_ids.xml` (no Nav2 resIds left to bridge modules).
-- `:app` is a `ComponentActivity` with `setContent { … RootNavigation() }` — a single `NavDisplay`.
-- Each feature exposes an `EntryProviderScope<NavKey>` builder — `homeEntries`, `catalogEntries`,
-  `authEntries` — the Nav3 **modularization** pattern. The app calls all three in one `entryProvider { }`.
-- The **catalog filter** stays a `BottomSheetSceneStrategy` overlay; the **confirm dialog** becomes a
-  `DialogSceneStrategy.dialog()` entry in root. Both are **scenes on the one display**, not separate hosts.
-- `:app`, `:feature:home`, `:feature:catalog`, `:feature:auth` dropped their Fragment / Navigation 2 /
-  Material Components dependencies; the app theme is back to a plain `android:Theme.Material.Light.NoActionBar`.
+## Что изменилось по сравнению с flow2/03
+- **Удалены** все Fragment-хосты (`HomeFragment`, `CatalogFragment`, `AuthFragment`,
+  `ConfirmDialogFragment`), все XML-графы (`nav_main`, `nav_catalog`, `nav_auth`), лейаут активити
+  и общий `navigation_ids.xml` (мостовые resId для Nav2 больше не нужны).
+- `:app` — это `ComponentActivity` с `setContent { … RootNavigation() }` — один `NavDisplay`.
+- Каждая фича предоставляет билдер `EntryProviderScope<NavKey>` — `homeEntries`, `catalogEntries`,
+  `authEntries` — паттерн **модуляризации** Nav3. Приложение вызывает все три внутри одного `entryProvider { }`.
+- **Фильтр каталога** остаётся оверлеем `BottomSheetSceneStrategy`; **диалог подтверждения** становится
+  записью `DialogSceneStrategy.dialog()` в корне. Оба — **сцены на одном дисплее**, а не отдельные хосты.
+- `:app`, `:feature:home`, `:feature:catalog`, `:feature:auth` избавились от зависимостей на Fragment / Navigation 2 /
+  Material Components; тема приложения вернулась к простому `android:Theme.Material.Light.NoActionBar`.
 
-## The whole app's navigation, in one place
+## Вся навигация приложения — в одном месте
 ```kotlin
-val backStack = rememberNavBackStack(HomeKey)   // ONE stack for the entire app
+val backStack = rememberNavBackStack(HomeKey)   // ОДИН стек для всего приложения
 
 NavDisplay(
     backStack = backStack,
@@ -31,29 +31,30 @@ NavDisplay(
     sceneStrategies = listOf(bottomSheetStrategy, DialogSceneStrategy()),
     entryProvider = entryProvider {
         homeEntries(backStack, onOpenCatalog = { backStack.add(CatalogList) }, onOpenAuth = { backStack.add(PhoneKey) })
-        catalogEntries(backStack)                                  // list → detail + filter sheet
-        authEntries(backStack, onComplete = { _, _ -> /* pop auth sub-flow */ })
+        catalogEntries(backStack)                                  // список → детали + нижний лист фильтра
+        authEntries(backStack, onComplete = { _, _ -> /* выходим из суб-флоу авторизации */ })
     },
 )
 ```
 
-### Modularization pattern
-A feature owns its keys and an extension on `EntryProviderScope<NavKey>`. The app composes them inside
-one `entryProvider { }`. A feature never depends on another feature; cross-feature jumps are wired in
-the app (the only module that sees all keys), passed as lambdas. At scale you'd register these builders
-with Dagger multibindings (`@IntoSet`) and `forEach` them — no central list to maintain.
+### Паттерн модуляризации
+Фича владеет своими ключами и расширением на `EntryProviderScope<NavKey>`. Приложение компонует их внутри
+одного `entryProvider { }`. Фича никогда не зависит от другой фичи; переходы между фичами прокидываются
+через приложение (единственный модуль, которому видны все ключи) в виде лямбд. В масштабе эти билдеры
+можно регистрировать через Dagger multibindings (`@IntoSet`) и обходить через `forEach` — никакого
+центрального списка, который нужно поддерживать.
 
-## The migration, end to end (the point of this flow)
-1. **flow2/01** — everything Nav2 + Fragments; a leaf feature (Catalog) and a root dialog in place.
-2. **flow2/02** — migrate the **Catalog** feature (its nav + bottom sheet) to a local Nav3 island.
-3. **flow2/03** — migrate the **auth** flow to Nav3; typed data flows phone → sms → name.
-4. **flow2/04** — migrate the **host**: collapse the islands into one root `NavDisplay`; the confirm
-   dialog (last overlay in root) becomes a `DialogSceneStrategy` scene. From the leaves to the root.
+## Миграция от начала до конца (ради этого и задуман флоу)
+1. **flow2/01** — всё на Nav2 + фрагментах; листовая фича (Catalog) и корневой диалог на месте.
+2. **flow2/02** — мигрируем фичу **Catalog** (её граф + нижний лист) на локальный Nav3-остров.
+3. **flow2/03** — мигрируем флоу **авторизации** на Nav3; типизированные потоки данных: телефон → смс → имя.
+4. **flow2/04** — мигрируем **хост**: объединяем острова в один корневой `NavDisplay`; диалог подтверждения
+   (последний оверлей в корне) становится сценой `DialogSceneStrategy`. От листьев к корню.
 
-## 🎤 Speaker cues
-- `git diff flow2/03 flow2/04 --stat` — watch fragments, layouts and nav XML get deleted.
-- Open `MainActivity.kt`: "This is the whole app's navigation. One stack, two scene strategies, three feature builders."
-- Run the full app: home → Catalog (list → detail, filter sheet) → back; home → auth (phone → sms →
-  name) → finish; home → confirm dialog. All one back stack; system/predictive back works throughout.
-- "We migrated leaves first (catalog, auth) and the host last — so each step was small and the outer
-  shell kept working the whole time."
+## 🎤 Реплики для докладчика
+- `git diff flow2/03 flow2/04 --stat` — смотрим, как удаляются фрагменты, лейауты и XML-графы навигации.
+- Открываем `MainActivity.kt`: «Это вся навигация приложения. Один стек, две стратегии сцен, три билдера фич.»
+- Запускаем всё приложение: главный → Каталог (список → детали, нижний лист фильтра) → назад; главный → авторизация (телефон → смс →
+  имя) → завершение; главный → диалог подтверждения. Всё — один бэкстек; системная кнопка «Назад» и предиктивный бэк работают везде.
+- «Мы мигрировали сначала листья (каталог, авторизацию), а хост — последним: каждый шаг был небольшим, и внешняя
+  оболочка продолжала работать всё это время.»
