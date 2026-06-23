@@ -1,15 +1,14 @@
-# flow1/02-scenes — Bottom sheets & multipane, without changing the back stack
+# flow1/02-scenes — Нижние листы и многопанельный интерфейс без изменения бэкстека
 
-**Goal:** add real layout complexity (an overlay bottom sheet + an adaptive two-pane list/detail)
-and show that it's all done by **scene strategies**, not by changing how you navigate.
+**Цель:** добавить реальную сложность разметки (оверлей с нижним листом + адаптивный двухпанельный список/детали) и показать, что всё это реализуется через **стратегии сцен**, а не через изменение способа навигации.
 
-## What changed vs `flow1/01-basics`
-- Added a copied-in **`BottomSheetSceneStrategy`** recipe (`app/.../scene/BottomSheetSceneStrategy.kt`).
-- Added a `Filter` destination rendered as a bottom sheet via metadata.
-- Wrapped list/detail with Material's adaptive **`ListDetailSceneStrategy`** so they go side-by-side on wide screens.
-- `NavDisplay` now takes `sceneStrategies = listOf(...)`. The back stack code is otherwise identical.
+## Что изменилось по сравнению с `flow1/01-basics`
+- Добавлена скопированная готовая реализация **`BottomSheetSceneStrategy`** (`app/.../scene/BottomSheetSceneStrategy.kt`).
+- Добавлен пункт назначения `Filter`, который отображается как нижний лист через метаданные.
+- Список/детали обёрнуты в адаптивный **`ListDetailSceneStrategy`** от Material — на широких экранах они отображаются рядом.
+- `NavDisplay` теперь принимает `sceneStrategies = listOf(...)`. Код бэкстека при этом остался полностью идентичным.
 
-## The mental model: Scenes decide *layout*, the back stack stays the same
+## Ментальная модель: сцены определяют *разметку*, бэкстек остаётся неизменным
 
 ```kotlin
 val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
@@ -18,31 +17,31 @@ val bottomSheetStrategy = remember { BottomSheetSceneStrategy<NavKey>() }
 NavDisplay(
     backStack = backStack,
     onBack = { backStack.removeLastOrNull() },
-    sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy), // tried in order; first match wins
+    sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy), // проверяются по порядку; побеждает первое совпадение
     entryProvider = entryProvider {
         entry<ProductList>(metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { … })) { … }
         entry<ProductDetail>(metadata = ListDetailSceneStrategy.detailPane()) { … }
-        entry<Filter>(metadata = BottomSheetSceneStrategy.bottomSheet()) { … }   // overlay
+        entry<Filter>(metadata = BottomSheetSceneStrategy.bottomSheet()) { … }   // оверлей
     },
 )
 ```
 
-Key points:
-- A **`SceneStrategy`** inspects the back stack and returns a `Scene` (a way to render one or more entries together). `NavDisplay` tries your strategies in order and falls back to single-pane if none apply.
-- An entry **opts in** to a scene through `metadata` (`listPane()`, `detailPane()`, `bottomSheet()`). The screen composable doesn't know or care.
-- **Order matters.** Overlay strategies (bottom sheet, dialog) must come first so they draw on top of the layout beneath them.
-- **Bottom sheets are a recipe, not core.** There is no `androidx` `BottomSheetSceneStrategy`; you copy the official one in. (Dialogs *are* core: `DialogSceneStrategy`.)
+Ключевые моменты:
+- **`SceneStrategy`** анализирует бэкстек и возвращает `Scene` (способ отрендерить одну или несколько записей вместе). `NavDisplay` перебирает стратегии по порядку и при отсутствии совпадения откатывается к одной панели.
+- Запись **подключается** к сцене через `metadata` (`listPane()`, `detailPane()`, `bottomSheet()`). Компосабл экрана об этом ничего не знает.
+- **Порядок важен.** Стратегии-оверлеи (нижний лист, диалог) должны идти первыми, чтобы отрисовываться поверх остальной разметки.
+- **Нижний лист — это рецепт, а не ядро библиотеки.** Готовой `BottomSheetSceneStrategy` в `androidx` нет; вы копируете официальную реализацию к себе. (Диалоги *являются* частью ядра: `DialogSceneStrategy`.)
 
-## Why it matters
-- **Adaptive UI is a navigation concern handled declaratively.** The same back stack (`[ProductList, ProductDetail]`) renders as two stacked screens on a phone and as two panes on a tablet/foldable — no separate navigation graphs, no `if (isTablet)` branching in your screens.
-- **A bottom sheet is a real back-stack entry.** System back / predictive back dismiss it for free, and it survives config changes, because it's just another `NavEntry` — not an ad-hoc `ModalBottomSheet` boolean state hanging off a screen.
+## Почему это важно
+- **Адаптивный UI — это задача навигации, решаемая декларативно.** Один и тот же бэкстек (`[ProductList, ProductDetail]`) на телефоне отображается как два последовательных экрана, а на планшете/складном устройстве — как две панели рядом. Никаких отдельных навигационных графов, никакого ветвления `if (isTablet)` внутри экранов.
+- **Нижний лист — это полноценная запись в бэкстеке.** Системный жест «Назад» и предиктивный жест «Назад» закрывают его автоматически, и он переживает смену конфигурации, потому что это просто ещё один `NavEntry` — не ситуативное булево состояние `ModalBottomSheet`, подвешенное к экрану.
 
-## What breaks if you do it the old way
-- Nav2 had no first-class multipane; you hand-rolled `if (twoPane)` layouts and juggled two `NavHost`s or a fragment + detail container, keeping their state in sync manually.
-- Bottom sheets were typically local `var showSheet by remember { mutableStateOf(false) }` — invisible to the back stack, easy to get wrong with predictive back, and not restored after process death.
+## Что сломается при использовании старого подхода
+- В Navigation 2 многопанельный интерфейс не поддерживался на первом уровне: приходилось вручную писать разметки `if (twoPane)` и жонглировать двумя `NavHost`ами или фрагментом с контейнером деталей, синхронизируя их состояние вручную.
+- Нижние листы, как правило, реализовывались через локальный `var showSheet by remember { mutableStateOf(false) }` — невидимый для бэкстека, ненадёжный при предиктивном жесте «Назад» и не восстанавливаемый после гибели процесса.
 
-## 🎤 Speaker cues
-- Run on a phone: tap a product (it pushes a detail screen). Now **rotate to landscape / run on a tablet / resize a foldable** — the *same* navigation state snaps into two panes. "I changed zero lines of navigation to get this."
-- Open the filter: show that **system back dismisses the sheet** because it's a back-stack entry.
-- Point at `sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy)` and explain the order rule (overlays first).
-- Note for the team: "Bottom sheet = copy the recipe; dialog = `DialogSceneStrategy` is built in."
+## 🎤 Реплики для докладчика
+- Запустите на телефоне: нажмите на продукт (в бэкстек добавляется экран деталей). Теперь **повернитесь в ландшафтный режим / запустите на планшете / измените размер окна на складном устройстве** — то же самое состояние навигации автоматически переходит в двухпанельный режим. «Я не изменил ни одной строки навигации, чтобы этого добиться.»
+- Откройте фильтр: покажите, что **системный жест «Назад» закрывает нижний лист**, потому что это запись в бэкстеке.
+- Укажите на `sceneStrategies = listOf(bottomSheetStrategy, listDetailStrategy)` и объясните правило порядка (оверлеи — первыми).
+- Замечание для команды: «Нижний лист = копируем рецепт; диалог = `DialogSceneStrategy` встроен в библиотеку.»
