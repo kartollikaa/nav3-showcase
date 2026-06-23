@@ -1,49 +1,44 @@
-# flow2/02-nav3-catalog — Migrate the first feature to Navigation 3
+# flow2/02-nav3-catalog — Миграция первой фичи на Navigation 3
 
-We start the migration where it's safest: **one leaf feature**. The whole **Catalog** feature — its
-internal `list → product` navigation AND its **filter bottom sheet** — now runs on a **local Nav3
-`NavDisplay`** inside a single `CatalogFragment`. Everything else (home, auth, the confirm dialog) is
-still Navigation 2. The two frameworks coexist by isolation: Nav3 lives entirely inside one Fragment
-that the outer Nav2 `NavController` still hosts.
+Начинаем миграцию там, где это безопаснее всего: **один листовой модуль**. Вся фича **Catalog** — внутренняя навигация `list → product` И **нижний лист фильтра** — теперь работает на **локальном `NavDisplay` Nav3** внутри одного `CatalogFragment`. Всё остальное (home, auth, диалог подтверждения) по-прежнему использует Navigation 2. Оба фреймворка сосуществуют за счёт изоляции: Nav3 живёт целиком внутри одного Fragment, который внешний `NavController` Nav2 по-прежнему хостит.
 
-## What changed vs flow2/01
-- `:feature:catalog` went from **three Fragments + an XML graph** (`CatalogListFragment`,
-  `ProductFragment`, `FilterBottomSheetFragment`, with actions/args/`<dialog>`) to:
-  - Typed keys: `CatalogList`, `ProductDetail(id)`, `FilterKey` (`NavKey`, `@Serializable`).
-  - `CatalogFragment` — one host Fragment whose content is a Nav3 `NavDisplay` (`CatalogNavigation`).
-  - The filter is a Nav3 destination rendered by the copied-in `BottomSheetSceneStrategy` recipe
-    (`entry<FilterKey>(metadata = BottomSheetSceneStrategy.bottomSheet())`), not a `BottomSheetDialogFragment`.
-  - `nav_catalog.xml` shrank to a single `catalogFragment` destination (still `@id/dest_catalog`).
-- Deps: catalog dropped `google-android-material`, `navigation-fragment-ktx` and `core-ktx`, and gained
-  `navigation3-runtime/ui`, `kotlinx-serialization-core`, `lifecycle-runtime-compose` + the
-  serialization plugin.
-- **Untouched:** home, auth (nested Nav2 graph), the root confirm dialog. Home still navigates to the
-  catalog by the same `R.id.dest_catalog`.
+## Что изменилось относительно flow2/01
+- `:feature:catalog` перешёл от **трёх Fragment + XML-графа** (`CatalogListFragment`,
+  `ProductFragment`, `FilterBottomSheetFragment`, с actions/args/`<dialog>`) к:
+  - Типобезопасным ключам: `CatalogList`, `ProductDetail(id)`, `FilterKey` (`NavKey`, `@Serializable`).
+  - `CatalogFragment` — один хост-Fragment, содержимое которого — `NavDisplay` Nav3 (`CatalogNavigation`).
+  - Фильтр — это пункт назначения Nav3, отрисованный с помощью встроенного рецепта `BottomSheetSceneStrategy`
+    (`entry<FilterKey>(metadata = BottomSheetSceneStrategy.bottomSheet())`), а не `BottomSheetDialogFragment`.
+  - `nav_catalog.xml` сократился до единственного пункта назначения `catalogFragment` (по-прежнему `@id/dest_catalog`).
+- Зависимости: catalog убрал `google-android-material`, `navigation-fragment-ktx` и `core-ktx`, добавил
+  `navigation3-runtime/ui`, `kotlinx-serialization-core`, `lifecycle-runtime-compose` + плагин сериализации.
+- **Не тронуто:** home, auth (вложенный граф Nav2), корневой диалог подтверждения. Home по-прежнему переходит в
+  catalog по тому же `R.id.dest_catalog`.
 
-## The shape
+## Структура
 ```
 NavHostFragment (nav_main)  — Navigation 2
 ├── homeFragment
 ├── include(nav_catalog)  @id/dest_catalog → catalogFragment
-│      └── CatalogFragment hosts a Nav3 NavDisplay:
-│             CatalogList → ProductDetail(id)         (owned back stack: add / removeLastOrNull)
-│             FilterKey   → BottomSheetSceneStrategy   (overlay scene)
-├── include(nav_auth)     @id/dest_auth   → phone → sms → name   (still Nav2)
-└── confirmDialog         @id/dest_confirm                       (still Nav2, still in root)
+│      └── CatalogFragment хостит NavDisplay Nav3:
+│             CatalogList → ProductDetail(id)         (собственный бэкстек: add / removeLastOrNull)
+│             FilterKey   → BottomSheetSceneStrategy   (сцена-оверлей)
+├── include(nav_auth)     @id/dest_auth   → phone → sms → name   (по-прежнему Nav2)
+└── confirmDialog         @id/dest_confirm                       (по-прежнему Nav2, по-прежнему в корне)
 ```
 
-## Why this is the right first step
-- **Lowest risk, highest clarity.** A leaf feature has no incoming dependencies; converting it can't
-  break anyone else. The outer Nav2 graph doesn't even know its contents changed.
-- **The win is immediate.** Inside the island the back stack is a list you own, the product id is a
-  typed `ProductDetail(id)` (no Bundle), and the bottom sheet is a destination, not a Fragment subclass.
-- **The seam is one Fragment.** `CatalogFragment` is the entire Nav2↔Nav3 boundary. Because the catalog
-  is a leaf, it doesn't even need to bridge back out — contrast the migration branches that follow.
+## Почему это правильный первый шаг
+- **Минимальный риск, максимальная наглядность.** У листового модуля нет входящих зависимостей; его конвертация
+  не сломает ничего вокруг. Внешний граф Nav2 даже не знает, что его содержимое изменилось.
+- **Выигрыш виден сразу.** Внутри островка бэкстек — это список, которым вы владеете; идентификатор продукта — это
+  типобезопасный `ProductDetail(id)` (без Bundle); нижний лист — пункт назначения, а не подкласс Fragment.
+- **Шов — один Fragment.** `CatalogFragment` — это вся граница Nav2↔Nav3. Поскольку catalog является листовым модулем,
+  он даже не требует обратного моста наружу — в отличие от веток миграции, которые следуют далее.
 
-## 🎤 Speaker cues
-- `git diff flow2/01 flow2/02 --stat` — "the whole change is one feature; nothing else moved."
-- Open `CatalogNavigation.kt`: "list → detail is `backStack.add(...)`; the filter is just another
-  destination with a bottom-sheet scene. No XML, no Bundle, no BottomSheetDialogFragment."
-- On device: home → Catalog → product → back, and open the filter sheet. "All Nav3, inside one Fragment."
-- Then home → auth and home → confirm: "still Nav2 — we migrated exactly one feature."
-- Tease next: "Next we convert the auth flow; the host stays Nav2 the longest, on purpose."
+## 🎤 Реплики для докладчика
+- `git diff flow2/01 flow2/02 --stat` — «всё изменение — одна фича; больше ничего не двигалось.»
+- Открыть `CatalogNavigation.kt`: «list → detail — это `backStack.add(...)`; фильтр — просто ещё один
+  пункт назначения со сценой нижнего листа. Никакого XML, никакого Bundle, никакого BottomSheetDialogFragment.»
+- На устройстве: home → Catalog → продукт → назад, и открыть панель фильтра. «Всё Nav3 внутри одного Fragment.»
+- Затем home → auth и home → confirm: «по-прежнему Nav2 — мы мигрировали ровно одну фичу.»
+- Анонс следующего: «Далее конвертируем поток auth; хост дольше всех остаётся на Nav2 — намеренно.»
