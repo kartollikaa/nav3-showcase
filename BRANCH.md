@@ -1,51 +1,43 @@
-# flow2/03-nav3-auth-flow — Migrate the auth flow to Navigation 3
+# flow2/03-nav3-auth-flow — Миграция флоу авторизации на Navigation 3
 
-Second feature migrated. The **auth flow** (`phone → sms → name`) — previously three Fragments wired
-by an XML nested graph with **no data flowing between steps** — is now a single `AuthFragment` hosting
-a Nav3 `NavDisplay` over three typed keys. The **Catalog feature is already on Nav3** (previous
-branch). The **host (home) and the root confirm dialog are still Navigation 2** — the host migrates last.
+Мигрирована вторая фича. **Флоу авторизации** (`phone → sms → name`) — ранее три Fragment'а, связанных XML-вложенным графом **без передачи данных между шагами** — теперь представляет собой единый `AuthFragment`, который хостит Nav3 `NavDisplay` с тремя типобезопасными ключами. **Фича Catalog уже переведена на Nav3** (предыдущая ветка). **Хост (home) и корневой диалог подтверждения всё ещё на Navigation 2** — хост мигрирует последним.
 
-## What changed vs flow2/02
-- `:feature:auth`: `PhoneFragment` / `SmsFragment` / `NameFragment` + the `phone→sms→name` XML actions
-  collapse into:
-  - `AuthFragment` — one host Fragment with a Nav3 `NavDisplay` (`AuthNavigation`).
-  - Typed keys carrying data forward: `PhoneKey → SmsKey(phone) → NameKey(phone, code)`.
-  - `AuthScreens` now pass their value to the next step (`onNext: (String) -> Unit`) instead of the
-    Nav2 version's no-arg callbacks.
-  - `nav_auth.xml` shrinks to a single `authFragment` (still `@id/dest_auth`).
-- Deps: `:feature:auth` gains `navigation3-runtime/ui`, `kotlinx-serialization-core` + the
-  serialization plugin; keeps `navigation-fragment-ktx` only to **exit** the feature.
-- **Untouched:** the catalog (already Nav3), home, the root confirm dialog.
+## Что изменилось по сравнению с flow2/02
+- `:feature:auth`: `PhoneFragment` / `SmsFragment` / `NameFragment` + XML-экшены `phone→sms→name`
+  схлопываются в:
+  - `AuthFragment` — единый хост-Fragment с Nav3 `NavDisplay` (`AuthNavigation`).
+  - Типобезопасные ключи, передающие данные вперёд: `PhoneKey → SmsKey(phone) → NameKey(phone, code)`.
+  - `AuthScreens` теперь передают своё значение на следующий шаг (`onNext: (String) -> Unit`) вместо
+    колбэков без аргументов, как было в Nav2-версии.
+  - `nav_auth.xml` сжимается до единственного `authFragment` (по-прежнему `@id/dest_auth`).
+- Зависимости: `:feature:auth` получает `navigation3-runtime/ui`, `kotlinx-serialization-core` +
+  плагин сериализации; оставляет `navigation-fragment-ktx` только для того, чтобы **выйти** из фичи.
+- **Не тронуто:** catalog (уже на Nav3), home, корневой диалог подтверждения.
 
-## The win this branch shows: typed data flow
-Nav2 here never passed the phone number forward — each step kept local state (a documented pain point
-in flow2/01). Nav3 makes it the type system's job:
+## Что демонстрирует эта ветка: типизированная передача данных
+В Nav2 номер телефона здесь никогда не передавался вперёд — каждый шаг хранил локальное состояние (задокументированный болевой момент в flow2/01). Nav3 делает это задачей системы типов:
 ```kotlin
 entry<PhoneKey> { PhoneScreen(onNext = { phone -> backStack.add(SmsKey(phone)) }) }
 entry<SmsKey>   { key -> SmsScreen(phone = key.phone, onNext = { code -> backStack.add(NameKey(key.phone, code)) }) }
 entry<NameKey>  { key -> NameScreen(onFinish = { name -> onAuthComplete(key.phone, name) }) }
 ```
-No Safe Args, no Bundle, no graph-scoped ViewModel — just typed constructor arguments.
+Никакого Safe Args, никакого Bundle, никакого ViewModel, привязанного к графу — только типизированные аргументы конструктора.
 
-## The shape
+## Структура
 ```
-NavHostFragment (nav_main)  — Navigation 2 host
-├── homeFragment                                                                  (still Nav2)
-├── include(nav_catalog)  @id/dest_catalog → CatalogFragment → Nav3 NavDisplay   (Nav3, branch 02)
-├── include(nav_auth)     @id/dest_auth   → AuthFragment    → Nav3 NavDisplay    (Nav3, THIS branch)
+NavHostFragment (nav_main)  — хост Navigation 2
+├── homeFragment                                                                  (всё ещё Nav2)
+├── include(nav_catalog)  @id/dest_catalog → CatalogFragment → Nav3 NavDisplay   (Nav3, ветка 02)
+├── include(nav_auth)     @id/dest_auth   → AuthFragment    → Nav3 NavDisplay    (Nav3, ЭТА ветка)
 │        PhoneKey → SmsKey(phone) → NameKey(phone, code)
-└── confirmDialog         @id/dest_confirm                                        (still Nav2, in root)
+└── confirmDialog         @id/dest_confirm                                        (всё ещё Nav2, в корне)
 ```
 
-## Back behaviour across the seam
-`NavDisplay` consumes system back while the auth stack has more than one entry (name → sms → phone).
-On the first step it stops consuming, so back falls through to the outer Nav2 `NavController`, which
-exits the feature to Home. `AuthFragment` bridges out on completion with `findNavController().popBackStack()`.
+## Поведение кнопки «Назад» на шве (границе)
+`NavDisplay` перехватывает системный жест «Назад», пока в стеке авторизации больше одной записи (name → sms → phone). На первом шаге он перестаёт перехватывать, и жест «Назад» проваливается во внешний Nav2 `NavController`, который выходит из фичи на Home. `AuthFragment` выходит из фичи по завершении через `findNavController().popBackStack()`.
 
-## 🎤 Speaker cues
-- `git diff flow2/02 flow2/03 --stat` — "second feature; the host is still untouched."
-- Open `AuthNavigation.kt`: "Three Fragments and an XML graph became three typed keys on one back
-  stack — and now the phone number actually flows to the SMS step, for free."
-- On device: home → auth → phone → sms (note "Code sent to …") → name → finish → back at home.
-- "Two features on Nav3 now, both as islands inside the Nav2 host. Next branch: we migrate the host
-  itself and collapse the islands into one root NavDisplay."
+## 🎤 Реплики для докладчика
+- `git diff flow2/02 flow2/03 --stat` — «Вторая фича; хост всё ещё не тронут.»
+- Открыть `AuthNavigation.kt`: «Три Fragment'а и XML-граф превратились в три типобезопасных ключа на одном бэкстеке — и теперь номер телефона реально передаётся на шаг с SMS, бесплатно.»
+- На устройстве: home → auth → phone → sms (обратите внимание на «Code sent to …») → name → finish → возврат на home.
+- «Теперь две фичи на Nav3, обе как острова внутри Nav2-хоста. Следующая ветка: мигрируем сам хост и объединяем острова в единый корневой NavDisplay.»
