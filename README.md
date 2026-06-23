@@ -33,18 +33,21 @@ before it.
 | `flow1/01-basics` | The simplest possible Nav3: an owned back stack + one `NavDisplay`, type-safe keys, no scenes/DI. |
 | `flow1/02-scenes` | Scenes: a **bottom sheet** overlay strategy and a **list-detail multipane** scene that adapts to width. |
 | `flow1/03-viewmodel-decorator` | `rememberViewModelStoreNavEntryDecorator` — per-destination ViewModel scoping, and what breaks without it. |
+| `flow1/04-animations` | Per-screen **and** per-entry transitions: one default `transitionSpec` for the whole graph, overridden for a single entry via metadata (predictive-back included). |
 
 ### Flow 2 — Migration (Fragments + Nav2 → Nav3, incrementally)
 
 | Branch | What it adds |
 | --- | --- |
 | `flow2/01-nav2-baseline` | A realistic multi-module app on **Fragments + Navigation 2**, but every screen is Compose. Nested auth flow, a bottom sheet, a dialog. |
-| `flow2/02-nav3-bottomsheet` | The smallest first step: replace **one** Nav2 bottom-sheet destination with a local `NavDisplay` + `BottomSheetSceneStrategy`. |
+| `flow2/02-nav3-catalog` | Migrate the **first whole feature**: the Catalog (list → product **and** its filter bottom sheet) runs on a local `NavDisplay` inside one Fragment; everything else stays Nav2. |
 | `flow2/03-nav3-auth-flow` | Replace a feature's **per-fragment nested navigation** (phone → SMS → name) with a single in-feature `NavDisplay` back stack. |
-| `flow2/04-unified` | Join the per-feature NavDisplays toward a **single root NavDisplay** — and a written answer to *"is more than one NavDisplay OK, and what for?"* |
+| `flow2/04-unified` | The destination: **one root `NavDisplay`** on a single back stack in a plain `ComponentActivity` — Fragments, the FragmentManager, and every XML graph deleted. |
+| `flow2/05-navgraph-plugin` | Same app at runtime; add [skydoves/compose-nav-graph](https://github.com/skydoves/compose-nav-graph) to render the whole flow as an interactive map from a few annotations (docs/visualization, no runtime change). |
 
-Each branch has its own `README.md` with: the concept, the key code, **why it matters**, **what
-breaks if you do it the old way**, and 🎤 **speaker cues**.
+Each branch has its own `BRANCH.md` with: the concept, the key code, **why it matters**, **what
+breaks if you do it the old way**, and 🎤 **speaker cues**. (`README.md` is this shared overview,
+carried unchanged on every branch.)
 
 ---
 
@@ -54,9 +57,11 @@ breaks if you do it the old way**, and 🎤 **speaker cues**.
 2. `flow1/01-basics` — the whole API in ~15 lines. Live-add a destination to show how cheap it is.
 3. `flow1/02-scenes` — resize the window to show multipane kick in; pop a bottom sheet.
 4. `flow1/03-viewmodel-decorator` — the subtle one. Show a ViewModel leaking, then fix it with one line.
-5. *Breather / Q&A.*
-6. `flow2/01-nav2-baseline` — "here's the app we actually have." Point at the Fragment + nested-graph pain.
-7. `flow2/02` → `03` → `04` — walk the incremental migration. End on the multiple-NavDisplay guidance.
+5. `flow1/04-animations` — tap a product to **zoom** (per-entry override), open the filter to **slide** (scene): default vs. per-destination motion, one screen.
+6. *Breather / Q&A.*
+7. `flow2/01-nav2-baseline` — "here's the app we actually have." Point at the Fragment + nested-graph pain.
+8. `flow2/02` → `03` → `04` — walk the incremental migration (first feature → auth flow → unified root). End on the single root `NavDisplay`.
+9. `flow2/05-navgraph-plugin` — optional closer: generate the annotated flow map so the navigation you just built becomes visible and reviewable.
 
 ---
 
