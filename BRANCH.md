@@ -1,63 +1,63 @@
-# flow2/05-navgraph-plugin — Draw the whole flow from annotations
+# flow2/05-navgraph-plugin — Отрисовка всего флоу по аннотациям
 
-Same app as `flow2/04-unified` at runtime — **nothing about navigation changed**. This branch adds
-[skydoves/compose-nav-graph](https://github.com/skydoves/compose-nav-graph): a Gradle plugin + KSP
-processor + Android Studio plugin that reads a few annotations and renders your **entire app flow as
-an interactive map** — every destination a node (with its rendered `@Preview` as a thumbnail), every
-transition a labelled arrow, every typed argument shown on the node.
+Рантайм приложения идентичен `flow2/04-unified` — **навигация не изменилась ни на байт**. В этой ветке добавлен
+[skydoves/compose-nav-graph](https://github.com/skydoves/compose-nav-graph): Gradle-плагин + KSP-процессор
++ плагин для Android Studio, которые читают несколько аннотаций и отрисовывают **весь флоу приложения как
+интерактивную карту** — каждый пункт назначения это узел (с отрисованным `@Preview` в виде миниатюры),
+каждый переход — подписанная стрелка, каждый типизированный аргумент — выноска на узле.
 
-It is a **documentation/visualization** tool, not a navigation library: it generates no runtime code;
-a "route" is any class (it doesn't need to implement `NavKey`). KSP extracts the graph to
-`nav-graph.json`, the Gradle plugin renders thumbnails, and the IDE plugin draws the canvas.
+Это **инструмент документирования/визуализации**, а не навигационная библиотека: он не генерирует никакого кода
+во время выполнения; «маршрут» — это любой класс (реализовывать `NavKey` не обязательно). KSP извлекает граф в
+`nav-graph.json`, Gradle-плагин отрисовывает миниатюры, а IDE-плагин рисует холст.
 
-## What changed vs `flow2/04-unified`
-- **Build:** added KSP (`2.2.21-2.0.5`) and the navgraph plugin (`0.1.2`) to the version catalog, and
-  applied both to `:feature:home`, `:feature:catalog`, `:feature:auth`, and `:app`. The plugin auto-adds
-  the annotations + KSP processor. `ui-tooling` is promoted to a full `implementation` in the feature
-  modules (the device-free renderer needs `ComposeViewAdapter`).
-- **Annotations only** on existing code — no navigation logic touched.
+## Что изменилось по сравнению с `flow2/04-unified`
+- **Сборка:** в каталог версий добавлены KSP (`2.2.21-2.0.5`) и navgraph-плагин (`0.1.2`),
+  оба подключены к `:feature:home`, `:feature:catalog`, `:feature:auth` и `:app`. Плагин автоматически
+  добавляет аннотации + KSP-процессор. `ui-tooling` повышен до полной `implementation` в фича-модулях
+  (бездевайсному рендереру нужен `ComposeViewAdapter`).
+- **Только аннотации** на существующем коде — навигационная логика не затронута.
 
-## The four annotations
+## Четыре аннотации
 ```kotlin
-// 1) The keys ARE the graph — annotate the route classes with structure.
-@NavGraphRoot                                          // the start destination
+// 1) Ключи и есть граф — аннотируем классы маршрутов, задавая структуру.
+@NavGraphRoot                                          // стартовый пункт назначения
 @NavEdge(to = ConfirmKey::class, label = "Confirm order")
 @Serializable data object HomeKey : NavKey
 
-// 2) Link each route to the composable that renders it (the node's click target).
+// 2) Связываем каждый маршрут с composable-функцией, которая его отрисовывает (цель клика по узлу).
 @NavDestination(route = CatalogList::class)
 @Composable fun ProductListScreen(/* … */) { /* … */ }
 
-// 3) Link a @Preview to a route so its rendered image becomes the node's thumbnail.
+// 3) Привязываем @Preview к маршруту, чтобы его отрисованное изображение стало миниатюрой узла.
 @NavPreview(route = CatalogList::class, primary = true)
 @Preview @Composable private fun ProductListPreview() = Nav3ShowcaseTheme { ProductListScreen(/* stubs */) }
 ```
 
-## The map it draws — 8 nodes, 8 edges
-- **Start:** `HomeKey`.
-- **Intra-feature edges** on the route classes (same module): `HomeKey → ConfirmKey`;
+## Карта, которую строит инструмент — 8 узлов, 8 рёбер
+- **Старт:** `HomeKey`.
+- **Рёбра внутри фичи** на классах маршрутов (один модуль): `HomeKey → ConfirmKey`;
   `CatalogList → ProductDetail`, `CatalogList → FilterKey`; `PhoneKey → SmsKey`, `SmsKey → NameKey`.
-- **Cross-feature edges** in `:app` (`RootNavigation`, explicit `from`/`to`): `HomeKey → CatalogList`,
-  `HomeKey → PhoneKey`, `NameKey → HomeKey` — `:app` is the only module that sees every feature's keys.
-- **Typed-argument arrows:** `ProductDetail.id`, `SmsKey.phone`, `NameKey.phone`/`code` (serializable
-  properties become args automatically — the type IS the contract).
-- **Thumbnails:** all 8 nodes link a no-arg `@Preview` via `@NavPreview`.
+- **Межфичевые рёбра** в `:app` (`RootNavigation`, явные `from`/`to`): `HomeKey → CatalogList`,
+  `HomeKey → PhoneKey`, `NameKey → HomeKey` — `:app` — единственный модуль, видящий ключи всех фич.
+- **Стрелки типизированных аргументов:** `ProductDetail.id`, `SmsKey.phone`, `NameKey.phone`/`code` (сериализуемые
+  свойства становятся аргументами автоматически — тип и есть контракт).
+- **Миниатюры:** все 8 узлов связаны с безаргументным `@Preview` через `@NavPreview`.
 
-## Requirements / gotcha
-- The graph (`nav-graph.json`, KSP) builds on the project's normal **JDK 17** toolchain; `assembleDebug`
-  is unchanged and green.
-- **Thumbnail rendering needs JDK 21.** The navgraph layoutlib renderer ships compiled for Java 21
-  (`class file version 65.0`); on JDK 17 the render step fails and you get the graph with no thumbnails.
-  Run Android Studio / Gradle on a JDK 21 to render them. No AGP / Kotlin / Gradle / compileSdk change.
+## Требования / подводные камни
+- Граф (`nav-graph.json`, KSP) собирается на обычном **JDK 17**-тулчейне проекта; `assembleDebug`
+  работает без изменений.
+- **Отрисовка миниатюр требует JDK 21.** Рендерер layoutlib из navgraph-плагина скомпилирован под Java 21
+  (`class file version 65.0`); на JDK 17 шаг отрисовки падает и граф получается без миниатюр.
+  Для их генерации запускайте Android Studio / Gradle на JDK 21. AGP / Kotlin / Gradle / compileSdk не меняются.
 
-## 🎤 Speaker cues
-- `git diff flow2/04 flow2/05 --stat` — "no navigation code changed; it's all annotations + plugin wiring."
-- Open `HomeKeys.kt` / `CatalogKeys.kt`: "The keys *are* the graph. `@NavGraphRoot` + `@NavEdge` and the map draws itself."
-- `./gradlew :app:generateNavGraph` (on JDK 21) → open the **NavGraph** tool window: the live map with
-  thumbnails, typed-argument arrows, and the cross-feature `Open Catalog` / `Start auth` / `Finish` edges.
-- The honest caveat: "this doesn't change how you navigate; it makes the navigation you already have
-  *visible and reviewable*."
+## 🎤 Реплики для докладчика
+- `git diff flow2/04 flow2/05 --stat` — «навигационный код не изменился; это только аннотации + подключение плагина.»
+- Открываем `HomeKeys.kt` / `CatalogKeys.kt`: «Ключи *и есть* граф. `@NavGraphRoot` + `@NavEdge` — и карта рисуется сама.»
+- `./gradlew :app:generateNavGraph` (на JDK 21) → открываем инструмент **NavGraph**: живая карта с
+  миниатюрами, стрелками типизированных аргументов и межфичевыми рёбрами `Open Catalog` / `Start auth` / `Finish`.
+- Честная оговорка: «это не меняет то, как вы навигируете; это делает уже имеющуюся навигацию
+  *видимой и поддающейся ревью*.»
 
-## Try it
-`./gradlew :app:generateNavGraph` then open the project in Android Studio (JDK 21) and the **NavGraph
-Graph** tool window. Or inspect `app/build/navgraph-aggregated/nav-graph.json` directly.
+## Попробуй сам
+`./gradlew :app:generateNavGraph`, затем открой проект в Android Studio (JDK 21) и инструмент **NavGraph
+Graph**. Или загляни напрямую в `app/build/navgraph-aggregated/nav-graph.json`.
