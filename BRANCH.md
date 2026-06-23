@@ -1,48 +1,48 @@
-# flow1/01-basics — Navigation 3 in its simplest form
+# flow1/01-basics — Navigation 3 в простейшей форме
 
-**Goal:** show the whole Nav3 API with nothing else around it. No scenes, no DI, no nested graphs,
-no ViewModels. Just an owned back stack and one `NavDisplay`.
+**Цель:** показать полный API Nav3 без лишнего. Никаких сцен, никакого DI, никаких вложенных графов,
+никаких ViewModel. Только бэкстек, которым вы владеете, и один `NavDisplay`.
 
-## What changed vs `main`
-- New feature module `:feature:catalog` with two typed keys and two dumb screens.
-- `MainActivity` gained ~15 lines of navigation. That's all of it.
+## Что изменилось относительно `main`
+- Новый листовой модуль `:feature:catalog` с двумя типобезопасными ключами и двумя простыми экранами.
+- `MainActivity` получила ~15 строк навигации. Это всё.
 
-## Core idea: the back stack is a list you own
+## Основная идея: бэкстек — это список, которым вы владеете
 
 ```kotlin
-val backStack = rememberNavBackStack(ProductList)   // a saveable observable List<NavKey>
+val backStack = rememberNavBackStack(ProductList)   // сохраняемый наблюдаемый List<NavKey>
 
 NavDisplay(
     backStack = backStack,
-    onBack = { backStack.removeLastOrNull() },        // back  = remove last
+    onBack = { backStack.removeLastOrNull() },        // «Назад» = удалить последний элемент
     entryProvider = entryProvider {
         entry<ProductList> {
-            ProductListScreen(onProductClick = { id -> backStack.add(ProductDetail(id)) }) // forward = add
+            ProductListScreen(onProductClick = { id -> backStack.add(ProductDetail(id)) }) // вперёд = добавить
         }
         entry<ProductDetail> { key -> ProductDetailScreen(id = key.id, onBack = { backStack.removeLastOrNull() }) }
     },
 )
 ```
 
-Three concepts, and you've seen all of them:
-1. **Keys** — typed objects implementing `NavKey` (`ProductList`, `ProductDetail(id)`). They are the routes.
-2. **Back stack** — a `List` you mutate. `add` = navigate, `removeLastOrNull` = back.
-3. **`NavDisplay` + `entryProvider`** — observes the stack, renders the top key's content.
+Три концепции — и вы уже увидели всё:
+1. **Ключи** — типизированные объекты, реализующие `NavKey` (`ProductList`, `ProductDetail(id)`). Они и есть маршруты.
+2. **Бэкстек** — `List`, который вы изменяете сами. `add` = навигация вперёд, `removeLastOrNull` = назад.
+3. **`NavDisplay` + `entryProvider`** — наблюдает за стеком, отображает содержимое верхнего ключа.
 
-## Why it matters
-- **You can see and test your navigation state.** It's a list. `println(backStack)`, assert on it in a unit test, time-travel it. In Nav2 the back stack lived inside a `NavController` you couldn't easily inspect.
-- **Type-safe arguments for free.** `ProductDetail(id)` is constructed by the compiler. There is no `"product/{id}"` template to typo and no `bundle.getString("id")!!` to crash on.
-- **Screens don't depend on navigation.** They take callbacks. The whole feature module doesn't even depend on `navigation3-ui` — only on `navigation3-runtime` for the `NavKey` marker.
+## Почему это важно
+- **Состояние навигации можно видеть и тестировать.** Это список. `println(backStack)`, утверждения в юнит-тесте, перемотка состояния. В Navigation 2 бэкстек находился внутри NavController, который было сложно инспектировать.
+- **Типобезопасные аргументы из коробки.** `ProductDetail(id)` создаётся компилятором. Никакого шаблона `"product/{id}"`, в котором можно допустить опечатку, и никакого `bundle.getString("id")!!`, способного вызвать краш.
+- **Экраны не зависят от навигации.** Они принимают колбэки. Весь листовой модуль даже не зависит от `navigation3-ui` — только от `navigation3-runtime` ради маркера `NavKey`.
 
-## What breaks if you do it the old way (Nav2)
-- Route strings → runtime crashes when a route or argument name is mistyped; refactors don't catch call sites.
-- Arguments serialized into the route string → you hand-roll parsing, and complex args don't fit.
-- The back stack is framework-owned → harder to do "remove the 2 screens under me", conditional flows, or restore arbitrary stacks.
+## Что ломается при использовании старого подхода (Navigation 2)
+- Строки маршрутов → краши в рантайме при опечатке в имени маршрута или аргумента; рефакторинг не находит места вызовов.
+- Аргументы, сериализованные в строку маршрута → вы вручную пишете разбор, а сложные аргументы туда вообще не помещаются.
+- Бэкстек принадлежит фреймворку → сложно реализовать «удалить 2 экрана подо мной», условные флоу или восстановление произвольных стеков.
 
-## 🎤 Speaker cues
-- Open `MainActivity.kt` and say: *"This is the whole thing. The back stack is a list. Forward is `add`, back is `removeLastOrNull`."*
-- Live edit: add `@Serializable data object Cart : NavKey`, an `entry<Cart> { ... }`, and a button that does `backStack.add(Cart)`. ~20 seconds, no graph file, no nav-args plugin. That cheapness is the point.
-- Ask the room: *"Who has shipped a crash from a typo'd deep-link route or a missing bundle arg?"* → segue to typed keys.
+## 🎤 Реплики для докладчика
+- Откройте `MainActivity.kt` и скажите: *«Вот и всё. Бэкстек — это список. Вперёд — `add`, назад — `removeLastOrNull`».*
+- Правка вживую: добавьте `@Serializable data object Cart : NavKey`, `entry<Cart> { ... }` и кнопку, выполняющую `backStack.add(Cart)`. ~20 секунд, никакого файла графа, никакого плагина nav-args. Вся суть — в этой простоте.
+- Спросите зал: *«Кто отправлял краш из-за опечатки в маршруте deep-link или отсутствующего аргумента в Bundle?»* → переход к типобезопасным ключам.
 
-## Try it
-Run the app, tap a product, press system back. Watch that "back" is literally a list mutation.
+## Попробуйте сами
+Запустите приложение, нажмите на товар, нажмите системную кнопку «Назад». Убедитесь, что «назад» — это буквально мутация списка.
