@@ -1,62 +1,60 @@
-# flow2/01-nav2-baseline — The "before": Fragments + Navigation 2 (with Compose UI)
+# flow2/01-nav2-baseline — «До»: Fragments + Navigation 2 (с Compose UI)
 
-This is the app we're migrating. Every screen is **Compose**, but it's hosted in **Fragments** and
-wired with **Navigation 2** — the most common setup in production today. Over the next branches we
-migrate it to Navigation 3 **from the leaves inward**: the **Catalog feature** first, then **auth**,
-and the **host** last. The **confirm dialog stays in root** the whole way.
+Это приложение, которое мы мигрируем. Каждый экран написан на **Compose**, но размещён во **Fragments** и
+связан через **Navigation 2** — самая распространённая конфигурация в production на сегодняшний день. В следующих ветках мы
+мигрируем на Navigation 3 **от листьев к корню**: сначала **фича Catalog**, затем **auth**,
+и в конце — **хост**. **Диалог подтверждения остаётся в корне** до самого конца.
 
-## What's here
-- `:app` — a `FragmentActivity` whose only layout is a `NavHostFragment` (`nav_main.xml`). The
-  Navigation 2 `NavController` owns the whole back stack. The **confirm dialog** is a root-level
-  `<dialog>` destination here — the one overlay that lives in root until the very end.
-- `:feature:catalog` — a self-contained feature with its **own nested graph** `nav_catalog.xml`:
-  `catalogList → product` (internal `<action>` + a `Bundle` arg for the id), plus a **filter
-  `BottomSheetDialogFragment`** as a `<dialog>` dest. The bottom sheet **belongs to the feature**.
-- `:feature:home` — `HomeFragment` (Compose via `ComposeView`); the app's entry screen with buttons
-  into Catalog, auth, and the confirm dialog. `ConfirmDialogContent` lives here; its destination is in root.
-- `:feature:auth` — its **own nested nav graph** `nav_auth.xml`: `phone → sms → name`, each a Fragment.
-- Cross-module navigation uses **shared destination resource IDs** (`dest_catalog`, `dest_auth`,
-  `dest_confirm`) declared in `:core:designsystem` — a module every feature depends on. So `HomeFragment`
-  can `findNavController().navigate(R.id.dest_…)` across module boundaries. (A destination's id is
-  otherwise generated in the module that owns its graph XML and invisible to siblings.) Navigation
-  *inside* a feature (catalog list → product → filter) uses that feature's own local R.id.
+## Что здесь есть
+- `:app` — `FragmentActivity`, единственный layout которой — `NavHostFragment` (`nav_main.xml`). `NavController` Navigation 2 владеет всем бэкстеком. **Диалог подтверждения** — это корневое назначение типа `<dialog>`, единственный оверлей, который живёт в корне до самого конца.
+- `:feature:catalog` — самодостаточный функциональный модуль со **своим вложенным графом** `nav_catalog.xml`:
+  `catalogList → product` (внутренний `<action>` + аргумент `Bundle` для id), а также **фильтр
+  `BottomSheetDialogFragment`** как пункт назначения `<dialog>`. Нижний лист **принадлежит фиче**.
+- `:feature:home` — `HomeFragment` (Compose через `ComposeView`); стартовый экран приложения с кнопками
+  перехода в Catalog, auth и диалог подтверждения. `ConfirmDialogContent` живёт здесь; его пункт назначения — в корне.
+- `:feature:auth` — **собственный вложенный граф навигации** `nav_auth.xml`: `phone → sms → name`, каждый — Fragment.
+- Навигация между модулями использует **общие resource ID пунктов назначения** (`dest_catalog`, `dest_auth`,
+  `dest_confirm`), объявленные в `:core:designsystem` — модуле, от которого зависит каждая фича. Поэтому `HomeFragment`
+  может вызвать `findNavController().navigate(R.id.dest_…)` через границы модулей. (Id пункта назначения в противном случае
+  генерируется в модуле, которому принадлежит XML-граф, и остаётся невидимым для соседних модулей.) Навигация
+  *внутри* фичи (catalog list → product → filter) использует собственный локальный R.id той фичи.
 
 ```
-NavHostFragment (nav_main)                          ← :app owns the host + root overlay
+NavHostFragment (nav_main)                          ← :app владеет хостом и корневым оверлеем
 ├── homeFragment
-├── include(nav_catalog)        @id/dest_catalog     ← feature owns its nav AND its bottom sheet
+├── include(nav_catalog)        @id/dest_catalog     ← фича владеет своей навигацией И своим нижним листом
 │     ├── catalogList → product (Bundle arg: id)
 │     └── filterSheet (BottomSheetDialogFragment)
-├── include(nav_auth)           @id/dest_auth        ← feature-owned nested graph
+├── include(nav_auth)           @id/dest_auth        ← вложенный граф, принадлежащий фиче
 │     └── phone → sms → name
-└── confirmDialog (DialogFragment, @id/dest_confirm) ← stays in ROOT until the end
+└── confirmDialog (DialogFragment, @id/dest_confirm) ← остаётся в КОРНЕ до самого конца
 ```
 
-## The pain points to point at during the talk (this is the motivation for Nav3)
-1. **Ceremony per screen.** Every destination is a `Fragment` + an `onCreateView` that news up a
-   `ComposeView`, sets a `ViewCompositionStrategy`, and re-hosts the theme. Compose, wrapped in a View,
-   wrapped in a Fragment, wrapped in the FragmentManager.
-2. **The back stack is hidden.** It lives inside the `NavController`/`FragmentManager`. You can't
-   inspect it as data or unit-test "what's on the stack".
-3. **Stringly-typed graph + IDs.** `R.id.action_catalogList_to_product`, `@id/...`, XML graphs. Typos
-   compile, then crash at runtime. And because a destination's id is invisible outside its module,
-   multi-module navigation forces you to hoist shared `<item type="id">` constants into a common module
-   to call `navigate(R.id.…)` across the boundary (or fall back to magic deep-link URI strings).
-4. **Shared state across a flow is awkward.** Passing the product id to the detail screen needs a
-   `Bundle` (or Safe Args); the auth steps don't even bother and keep local state.
-5. **Two UI worlds.** Fragment lifecycle *and* composition lifecycle, bridged by `ComposeView`. Two
-   sets of rules for one screen.
+## Болевые точки, которые стоит показать во время доклада (это и есть мотивация для Nav3)
+1. **Церемониал на каждый экран.** Каждый пункт назначения — это `Fragment` + `onCreateView`, который создаёт
+   `ComposeView`, задаёт `ViewCompositionStrategy` и переоборачивает тему. Compose, обёрнутый в View,
+   обёрнутый во Fragment, обёрнутый во FragmentManager.
+2. **Бэкстек скрыт.** Он живёт внутри `NavController`/`FragmentManager`. Вы не можете
+   изучить его как данные или написать unit-тест, проверяющий «что находится в стеке».
+3. **Граф на строках + ID.** `R.id.action_catalogList_to_product`, `@id/...`, XML-графы. Опечатки
+   компилируются, а затем вызывают crash в runtime. А поскольку id пункта назначения невидим за пределами своего модуля,
+   навигация между модулями вынуждает выносить общие константы `<item type="id">` в общий модуль,
+   чтобы вызвать `navigate(R.id.…)` через границу (либо откатываться к магическим строкам URI диплинков).
+4. **Общее состояние внутри флоу неудобно.** Передача id продукта на экран детали требует
+   `Bundle` (или Safe Args); шаги auth и вовсе не заморачиваются — держат состояние локально.
+5. **Два мира UI.** Жизненный цикл Fragment *и* жизненный цикл компоуза, соединённые через `ComposeView`. Два
+   набора правил для одного экрана.
 
-## Why we DON'T migrate all at once
-The official guide assumes a single atomic migration and explicitly does **not** support running Nav2
-and Nav3 side-by-side. But a real app can't stop for a big-bang rewrite. So the next branches do a
-**pragmatic, incremental** migration: convert the leaf-most, lowest-risk pieces first (a feature and
-its overlay), keep the Nav2 `NavController` as the outer shell, and converge on Nav3 from the inside out.
+## Почему мы НЕ мигрируем всё сразу
+Официальный гайд предполагает единую атомарную миграцию и явно **не поддерживает** одновременное использование Nav2
+и Nav3. Но реальное приложение не может остановиться ради переписывания «всё сразу». Поэтому следующие ветки выполняют
+**прагматичную, инкрементальную** миграцию: сначала конвертируем самые листовые, наименее рискованные части (фичу и
+её оверлей), сохраняем `NavController` Nav2 как внешнюю оболочку и сходимся к Nav3 изнутри.
 
-## 🎤 Speaker cues
-- Walk the structure: "Compose screens, but the navigation is pure Nav2 + Fragments. Sound familiar?"
-- Open `HomeFragment.kt`: "Count the lines before any actual UI. This boilerplate is on *every* screen."
-- Open Catalog on device: list → product (note the `Bundle` arg) → and the filter bottom sheet.
-  "This whole feature — its internal nav AND its bottom sheet — is what we migrate FIRST next branch."
-- Open the confirm dialog: "This overlay lives in the ROOT graph. It stays Nav2 until the very end."
-- End with: "Next branch — we migrate exactly ONE feature (Catalog) to Nav3, and nothing else changes."
+## 🎤 Реплики для докладчика
+- Пройдитесь по структуре: «Compose-экраны, но навигация — чистый Nav2 + Fragments. Звучит знакомо?»
+- Откройте `HomeFragment.kt`: «Посчитайте строки до того, как появляется реальный UI. Этот шаблонный код — на *каждом* экране.»
+- Откройте Catalog на устройстве: list → product (обратите внимание на аргумент `Bundle`) → и фильтр нижний лист.
+  «Вся эта фича — её внутренняя навигация И её нижний лист — именно её мы мигрируем ПЕРВОЙ в следующей ветке.»
+- Откройте диалог подтверждения: «Этот оверлей живёт в КОРНЕВОМ графе. Он остаётся на Nav2 до самого конца.»
+- Завершите: «Следующая ветка — мы мигрируем ровно ОДНУ фичу (Catalog) на Nav3, и больше ничего не меняется.»
