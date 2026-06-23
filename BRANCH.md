@@ -1,29 +1,28 @@
-# flow1/04-animations — Different transitions per screen and per entry
+# flow1/04-animations — Различные анимации переходов для отдельных экранов и отдельных записей
 
-**Goal:** control how `NavDisplay` animates between destinations — set one default transition for the
-whole graph, then **override it for a single entry** so different screens animate differently.
+**Цель:** управлять тем, как `NavDisplay` анимирует переходы между пунктами назначения — задать один переход по умолчанию для всего графа навигации, а затем **переопределить его для отдельной записи**, чтобы разные экраны анимировались по-разному.
 
-## What changed vs `flow1/03-viewmodel-decorator`
-- `NavDisplay` gained three transition parameters: `transitionSpec` (push), `popTransitionSpec` (back),
-  and `predictivePopTransitionSpec` (the swipe-back gesture). They are the **default** for every navigation.
-- The `ProductDetail` entry **overrides** those defaults via metadata — it zooms in (scale + fade)
-  while every other screen slides.
+## Что изменилось по сравнению с `flow1/03-viewmodel-decorator`
+- `NavDisplay` получил три параметра анимации перехода: `transitionSpec` (переход вперёд), `popTransitionSpec` (возврат назад)
+  и `predictivePopTransitionSpec` (жест смахивания назад). Они задают **значение по умолчанию** для всей навигации.
+- Запись `ProductDetail` **переопределяет** эти значения через метаданные — она появляется с эффектом масштабирования и затухания (scale + fade),
+  тогда как все остальные экраны используют скользящий переход.
 
-## The two levels
+## Два уровня
 
 ```kotlin
 NavDisplay(
-    // 1) DEFAULT for the whole graph. The receiver is an AnimatedContentTransitionScope, so
-    //    slideIntoContainer / slideOutOfContainer are available for free.
-    transitionSpec = {                                   // push (forward)
+    // 1) ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ для всего графа. Получателем является AnimatedContentTransitionScope, поэтому
+    //    slideIntoContainer / slideOutOfContainer доступны без дополнительной настройки.
+    transitionSpec = {                                   // переход вперёд
         (slideIntoContainer(SlideDirection.Start, tween(350)) + fadeIn(tween(350))) togetherWith
             (slideOutOfContainer(SlideDirection.Start, tween(350)) + fadeOut(tween(350)))
     },
-    popTransitionSpec = { /* mirror image: slide towards End */ },
-    predictivePopTransitionSpec = { /* reuse the pop animation for the swipe gesture */ },
+    popTransitionSpec = { /* зеркальное отражение: скольжение в направлении End */ },
+    predictivePopTransitionSpec = { /* переиспользуем анимацию возврата для жеста смахивания */ },
     entryProvider = entryProvider {
         entry<ProductDetail>(
-            // 2) PER-ENTRY override — wins over the default for THIS destination only.
+            // 2) ПЕРЕОПРЕДЕЛЕНИЕ ДЛЯ ОТДЕЛЬНОЙ ЗАПИСИ — имеет приоритет над значением по умолчанию ТОЛЬКО для этого пункта назначения.
             metadata = ListDetailSceneStrategy.detailPane() +
                 NavDisplay.transitionSpec { scaleIn(0.85f) + fadeIn() togetherWith fadeOut() } +
                 NavDisplay.popTransitionSpec { fadeIn() togetherWith (scaleOut(0.85f) + fadeOut()) },
@@ -32,35 +31,35 @@ NavDisplay(
 )
 ```
 
-A transition is just a `ContentTransform` — an `EnterTransition togetherWith` an `ExitTransition`,
-exactly like `AnimatedContent`. Nothing Nav3-specific about the motion itself; Nav3 only decides
-**which** `ContentTransform` to use for a given navigation.
+Анимация перехода — это просто `ContentTransform`: `EnterTransition togetherWith` `ExitTransition`,
+точно так же, как в `AnimatedContent`. В самой анимации нет ничего специфичного для Nav3; Nav3 лишь решает,
+**какой** `ContentTransform` использовать для конкретного перехода.
 
-## Precedence (who wins)
+## Приоритет (кто побеждает)
 ```
 transitioning NavEntry.metadata  >  current Scene.metadata  >  NavDisplay defaults
 ```
-`ProductDetail`'s per-entry spec overrides the display default; any entry without an override falls
-back to the default. (A `Scene` can also override entry metadata — see the nuance below.)
+Спецификация для отдельной записи `ProductDetail` переопределяет значение по умолчанию у NavDisplay; любая запись без переопределения
+использует значение по умолчанию. (Сцена тоже может переопределять метаданные записи — см. нюанс ниже.)
 
-## Why it matters
-- **One place for app-wide motion.** Set the house style once on `NavDisplay`; every screen inherits it.
-- **Per-destination expression.** A detail screen, a dialog, an onboarding step can each animate in a
-  way that fits — no global `AnimatedContent` plumbing, just metadata on the entry.
-- **Predictive back is first-class.** `predictivePopTransitionSpec` drives the Android 14+ swipe-back
-  preview and receives the swipe edge, so you can animate directionally.
+## Почему это важно
+- **Одно место для анимаций всего приложения.** Задайте фирменный стиль движения один раз в `NavDisplay` — каждый экран унаследует его.
+- **Выразительность для отдельных пунктов назначения.** Экран детали, диалог, шаг онбординга — каждый может анимироваться
+  в соответствии со своим контекстом, без глобальной настройки `AnimatedContent`, только метаданные на записи.
+- **Предиктивный жест «Назад» — полноценная возможность.** `predictivePopTransitionSpec` управляет предпросмотром свайпа назад
+  в Android 14+ и получает информацию о крае экрана, откуда начат свайп, что позволяет анимировать с учётом направления.
 
-## Scenes bring their own animation (the nuance)
-This branch still has the adaptive **list/detail** and **bottom-sheet** scenes from the earlier branches.
-`transitionSpec` animates **scene changes** — e.g. list → detail when the window is narrow (single pane).
-In two-pane mode list and detail share the *same* scene, so moving between them updates in place rather
-than running a transition. The bottom-sheet filter is an `OverlayScene`: its slide-up is the scene's own
-animation, not `transitionSpec`. Per-entry specs are honored by the single-pane scene.
+## Сцены приносят свою анимацию (нюанс)
+В этой ветке по-прежнему присутствуют адаптивные сцены **списка/детали** и **нижнего листа** из предыдущих веток.
+`transitionSpec` анимирует **смену сцен** — например, переход «список → деталь» при узком окне (однопанельный режим).
+В двухпанельном режиме список и деталь находятся в *одной* сцене, поэтому перемещение между ними обновляется на месте,
+без запуска анимации перехода. Фильтр в виде нижнего листа — это `OverlayScene`: его появление снизу — это анимация самой сцены,
+а не `transitionSpec`. Спецификации для отдельных записей учитываются однопанельной сценой.
 
-## 🎤 Speaker cues
-- On a phone (single pane): tap a product → it **zooms** in (the per-entry override); press back → it
-  zooms out. Open the filter → it **slides up** (scene animation). Three different motions, one screen.
-- Point at `transitionSpec`: "This is the default for the whole app — one slide + fade." Then at
-  `ProductDetail`'s metadata: "This one block makes just this destination zoom instead."
-- Recite the precedence line: "entry beats scene beats the NavDisplay default."
-- Mention `predictivePopTransitionSpec`: "the same hook drives the Android swipe-back preview."
+## 🎤 Реплики для докладчика
+- На телефоне (однопанельный режим): нажмите на товар → он **масштабируется** при появлении (переопределение для отдельной записи); нажмите «Назад» → он
+  масштабируется при уходе. Откройте фильтр → он **выезжает снизу** (анимация сцены). Три разных движения на одном экране.
+- Укажите на `transitionSpec`: «Это значение по умолчанию для всего приложения — скольжение плюс затухание». Затем на
+  метаданные `ProductDetail`: «Этот один блок заставляет именно этот пункт назначения масштабироваться вместо скольжения».
+- Прочитайте строку приоритета: «запись побеждает сцену, сцена побеждает значение по умолчанию NavDisplay».
+- Упомяните `predictivePopTransitionSpec`: «тот же хук управляет предпросмотром свайпа назад в Android».
